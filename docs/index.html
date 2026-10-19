@@ -770,7 +770,7 @@
             </h1>
             
             <p class="hero-desc">
-                BassBridge splits your computer or TV audio in real-time. Keep crisp vocal clarity and treble on your built-in speakers while sending tight, punchy sub-bass (&lt;120 Hz) to an Amazon Echo, boAt, or any Bluetooth speaker with zero phase distortion.
+                BassBridge splits your computer or TV audio in real-time. Keep crystal-clear dialogue and treble on your built-in speakers while sending tight, punchy sub-bass (&lt;85 Hz) to an Amazon Echo, boAt, or any Bluetooth speaker with zero voice leakage or paper fluttering.
             </p>
 
             <div class="hero-actions">
@@ -788,12 +788,12 @@
             <div class="demo-card" id="demo">
                 <div class="demo-header">
                     <div class="demo-title">
-                        <span>🎛️ Real-Time 4th-Order Crossover Simulator</span>
+                        <span>🎛️ Real-Time 8th-Order Voice Shield Crossover Simulator</span>
                     </div>
                     <div class="demo-controls">
                         <span style="font-size: 0.85rem; color: var(--text-muted);">Crossover Cutoff:</span>
-                        <input type="range" id="crossover-slider" class="crossover-slider" min="40" max="250" value="120" step="5">
-                        <span id="crossover-val" class="crossover-label">120 Hz</span>
+                        <input type="range" id="crossover-slider" class="crossover-slider" min="40" max="250" value="85" step="5">
+                        <span id="crossover-val" class="crossover-label">85 Hz</span>
                     </div>
                 </div>
 
@@ -802,11 +802,11 @@
                 <div class="spectrum-legend">
                     <div class="legend-item">
                         <div class="legend-color" style="background: var(--purple); box-shadow: 0 0 8px var(--purple);"></div>
-                        <span>Sub-Bass Path (&lt; <span id="legend-cutoff-sub">120</span> Hz) ➔ <strong>Bluetooth Speaker</strong></span>
+                        <span>Sub-Bass Path (&lt; <span id="legend-cutoff-sub">85</span> Hz) ➔ <strong>Bluetooth Speaker</strong></span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background: var(--cyan); box-shadow: 0 0 8px var(--cyan);"></div>
-                        <span>High-Pass Path (&gt; <span id="legend-cutoff-high">120</span> Hz) ➔ <strong>Laptop / TV Speakers</strong></span>
+                        <span>High-Pass Path (&gt; <span id="legend-cutoff-high">85</span> Hz) ➔ <strong>Laptop / TV Speakers</strong></span>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background: #E5E7EB;"></div>
@@ -823,27 +823,27 @@
         <div class="container">
             <div class="section-header">
                 <span class="section-tag">Audio Engineering</span>
-                <h2 class="section-title">Acoustics Engineered for Real Speakers</h2>
-                <p class="section-subtitle">No artificial EQ tricks. Built on pro-grade Linkwitz-Riley Butterworth cascaded digital filters.</p>
+                <h2 class="section-title">Acoustics Tuned to Portable Speaker Physics</h2>
+                <p class="section-subtitle">No artificial EQ bloat. Engineered specifically for small 1.5–2 inch Bluetooth drivers and clean dialogue.</p>
             </div>
 
             <div class="features-grid">
                 <div class="feature-card">
-                    <div class="feature-icon">⚡</div>
-                    <h3 class="feature-title">Linkwitz-Riley 4th-Order (LR4)</h3>
-                    <p class="feature-desc">Provides steep 24 dB/octave attenuation with exact 0 dB summed ripple and zero phase discrepancy at the crossover boundary, preventing comb-filtering.</p>
+                    <div class="feature-icon">🛡️</div>
+                    <h3 class="feature-title">48 dB/oct Brickwall Voice Shield</h3>
+                    <p class="feature-desc">Cascaded 8th-order Linkwitz-Riley crossover attenuates vocal fundamentals by &gt;39 dB at 150 Hz, completely eliminating dialogue doubling and echo on Netflix and YouTube.</p>
                 </div>
 
                 <div class="feature-card">
-                    <div class="feature-icon">🛡️</div>
-                    <h3 class="feature-title">Subsonic Cone Protection</h3>
-                    <p class="feature-desc">A steep 35 Hz infrasonic highpass filter removes inaudible speaker cone flutter, protecting small Bluetooth drivers and freeing power amplifier headroom.</p>
+                    <div class="feature-icon">🚫</div>
+                    <h3 class="feature-title">45 Hz 4th-Order Cone Protection</h3>
+                    <p class="feature-desc">Crushes inaudible 20–35 Hz sub-flutter by up to 28 dB. Stops small speaker cones from bottoming out, flapping, or making loose paper rumbling noises on movie explosions.</p>
                 </div>
 
                 <div class="feature-card">
                     <div class="feature-icon">🥊</div>
-                    <h3 class="feature-title">70 Hz Bass Punch & Clarity</h3>
-                    <p class="feature-desc">Parametric definition enhancement focused at 70 Hz delivers tight, tactile bass thump without the muddy, muffled rumble that ruins small speaker clarity.</p>
+                    <h3 class="feature-title">75 Hz Tight Punch & Safe Headroom</h3>
+                    <p class="feature-desc">Refined +1.8 dB punch at 75 Hz delivers tactile bass impact while a dedicated -1.1 dBFS limiter ceiling prevents portable speaker amplifier clipping and distortion.</p>
                 </div>
 
                 <div class="feature-card">
@@ -855,7 +855,7 @@
                 <div class="feature-card">
                     <div class="feature-icon">🔊</div>
                     <h3 class="feature-title">Coherent Mono-Summed Bass</h3>
-                    <p class="feature-desc">Subwoofers and portable speakers are single mono drivers. BassBridge mono-sums the sub-bass (<120 Hz) to eliminate stereo phase cancellation, doubling punch.</p>
+                    <p class="feature-desc">Subwoofers and portable speakers are single mono drivers. BassBridge mono-sums the sub-bass (<85 Hz) to eliminate stereo phase cancellation, doubling acoustic efficiency.</p>
                 </div>
 
                 <div class="feature-card">
@@ -1095,7 +1095,7 @@ python main.py</div>
         const legendSub = document.getElementById('legend-cutoff-sub');
         const legendHigh = document.getElementById('legend-cutoff-high');
 
-        let cutoffFreq = 120;
+        let cutoffFreq = 85;
         let animationFrameId;
 
         slider.addEventListener('input', (e) => {

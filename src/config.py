@@ -28,34 +28,34 @@ class Preset:
 DEFAULT_PRESETS: Dict[str, Preset] = {
     "Music": Preset(
         name="Music",
-        crossover_freq=120.0,
+        crossover_freq=90.0,
         bass_gain_db=1.5,
         main_volume=1.0,
         bass_volume=1.0,
         bass_split_enabled=True,
-        description="Balanced crossover for stereo music playback with warm low-end."
+        description="Balanced acoustic crossover for stereo music playback with warm, tight low-end."
     ),
     "Movies": Preset(
         name="Movies",
-        crossover_freq=100.0,
-        bass_gain_db=3.5,
+        crossover_freq=85.0,
+        bass_gain_db=2.0,
         main_volume=1.0,
-        bass_volume=1.2,
+        bass_volume=1.0,
         bass_split_enabled=True,
-        description="Deep cinematic sub-bass boost for explosions and atmospheric effects."
+        description="Cinematic sub-bass (<85 Hz) with 48 dB/oct voice isolation: zero dialog doubling or paper flutter."
     ),
     "Gaming": Preset(
         name="Gaming",
-        crossover_freq=90.0,
-        bass_gain_db=0.0,
+        crossover_freq=85.0,
+        bass_gain_db=1.0,
         main_volume=1.0,
         bass_volume=1.0,
         bass_split_enabled=False,
-        description="Tight sub-bass reinforcement; full-range laptop audio for low latency."
+        description="Tight sub-bass reinforcement; full-range laptop audio for low-latency positional gaming."
     ),
     "Custom": Preset(
         name="Custom",
-        crossover_freq=120.0,
+        crossover_freq=85.0,
         bass_gain_db=0.0,
         main_volume=1.0,
         bass_volume=1.0,
@@ -74,7 +74,7 @@ class AppConfig:
     capture_device_name: str = "Default"
 
     # Audio DSP parameters
-    crossover_freq: float = 120.0  # Range: 40.0 - 250.0 Hz
+    crossover_freq: float = 85.0   # Range: 40.0 - 250.0 Hz (Default 85 Hz for voice isolation)
     bass_gain_db: float = 0.0      # Range: -24.0 to +12.0 dB
     main_volume: float = 1.0       # Range: 0.0 to 1.5
     bass_volume: float = 1.0       # Range: 0.0 to 1.5
@@ -82,7 +82,7 @@ class AppConfig:
     bass_muted: bool = False
     bass_split_enabled: bool = True
     bass_clarity_enabled: bool = True    # Tight punch & vocal mud reduction
-    infrasonic_cut_enabled: bool = True  # Cut < 35 Hz sub-rumble for speaker protection
+    infrasonic_cut_enabled: bool = True  # Cut < 45 Hz sub-flutter for speaker cone protection
     bass_phase_inverted: bool = False    # 0 deg vs 180 deg acoustic phase flip
 
 

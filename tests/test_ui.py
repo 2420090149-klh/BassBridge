@@ -41,10 +41,10 @@ def test_main_window_initialization(qapp, tmp_path):
 
     # Test preset application via UI
     window._apply_preset("Movies")
-    assert window.slider_crossover.value() == 100
+    assert window.slider_crossover.value() == 85
 
     window._apply_preset("Gaming")
-    assert window.slider_crossover.value() == 90
+    assert window.slider_crossover.value() == 85
 
     # Test slider interaction
     window.slider_crossover.setValue(140)

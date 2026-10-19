@@ -14,24 +14,26 @@ import numpy as np
 import scipy.signal as signal
 
 
-class LinkwitzRiley4Filter:
-    """Linkwitz-Riley 4th-order (24 dB/octave) complementary crossover filter.
+class LinkwitzRileyFilter:
+    """Linkwitz-Riley complementary crossover filter (LR4 24 dB/oct or LR8 48 dB/oct).
 
-    Constructed by cascading two identical 2nd-order Butterworth filters in series.
-    Provides flat summed magnitude response (0 dB ripple) and zero phase difference
+    Constructed by cascading Butterworth filters in series.
+    Provides flat summed magnitude response (0 dB ripple) and zero phase discrepancy
     between low-pass and high-pass outputs at the crossover frequency.
+    Order 8 (48 dB/oct) provides brickwall acoustic voice isolation, eliminating dialog
+    bleed and vocal doubling in the sub-bass path.
     """
 
-    def __init__(self, cutoff_freq: float = 120.0, sample_rate: int = 48000) -> None:
+    def __init__(self, cutoff_freq: float = 85.0, sample_rate: int = 48000, order: int = 8) -> None:
         self.cutoff_freq = float(cutoff_freq)
         self.sample_rate = int(sample_rate)
+        self.order = int(order) if order in (4, 8) else 8
 
-        # SOS coefficients: shape (2, 6)
-        self.sos_lp: np.ndarray = np.zeros((2, 6), dtype=np.float64)
-        self.sos_hp: np.ndarray = np.zeros((2, 6), dtype=np.float64)
+        # Second-order section filters
+        self.sos_lp: np.ndarray = np.zeros((self.order // 2, 6), dtype=np.float64)
+        self.sos_hp: np.ndarray = np.zeros((self.order // 2, 6), dtype=np.float64)
 
-        # Persistent filter states for stereo channels: shape (2, 2, 2)
-        # [section, channel, delay_element]
+        # Persistent filter states for stereo channels: shape (n_sections, channels, 2)
         self.zi_lp: Optional[np.ndarray] = None
         self.zi_hp: Optional[np.ndarray] = None
 
@@ -43,31 +45,38 @@ class LinkwitzRiley4Filter:
         # Clamp cutoff safely below Nyquist to prevent numerical instability
         safe_fc = max(20.0, min(self.cutoff_freq, nyquist - 50.0))
 
-        # 2nd-order Butterworth low-pass and high-pass
-        sos_bw2_lp = signal.butter(2, safe_fc, btype="low", fs=self.sample_rate, output="sos")
-        sos_bw2_hp = signal.butter(2, safe_fc, btype="high", fs=self.sample_rate, output="sos")
+        # Cascade Butterworth sections to form Linkwitz-Riley
+        # LR4 = 2nd-order BW cascaded twice; LR8 = 4th-order BW cascaded twice
+        n_butter = self.order // 2
+        sos_bw_lp = signal.butter(n_butter, safe_fc, btype="low", fs=self.sample_rate, output="sos")
+        sos_bw_hp = signal.butter(n_butter, safe_fc, btype="high", fs=self.sample_rate, output="sos")
 
-        # Cascade two sections to form 4th-order Linkwitz-Riley
-        self.sos_lp = np.ascontiguousarray(np.vstack([sos_bw2_lp, sos_bw2_lp]), dtype=np.float64)
-        self.sos_hp = np.ascontiguousarray(np.vstack([sos_bw2_hp, sos_bw2_hp]), dtype=np.float64)
+        self.sos_lp = np.ascontiguousarray(np.vstack([sos_bw_lp, sos_bw_lp]), dtype=np.float64)
+        self.sos_hp = np.ascontiguousarray(np.vstack([sos_bw_hp, sos_bw_hp]), dtype=np.float64)
 
-        # Initialize filter states if not already done
-        if self.zi_lp is None:
-            # 2 sections, 2 channels (stereo), 2 delay registers
-            self.zi_lp = np.zeros((2, 2, 2), dtype=np.float64)
-            self.zi_hp = np.zeros((2, 2, 2), dtype=np.float64)
+        n_sections = self.sos_lp.shape[0]
+        if self.zi_lp is None or self.zi_lp.shape[0] != n_sections:
+            self.zi_lp = np.zeros((n_sections, 2, 2), dtype=np.float64)
+            self.zi_hp = np.zeros((n_sections, 2, 2), dtype=np.float64)
 
-    def set_crossover(self, cutoff_freq: float, sample_rate: Optional[int] = None) -> None:
-        """Update cutoff frequency and sample rate without resetting filter state."""
+    def set_crossover(self, cutoff_freq: float, sample_rate: Optional[int] = None, order: Optional[int] = None) -> None:
+        """Update cutoff frequency, sample rate, or order without resetting filter state."""
         cutoff_freq = max(30.0, min(350.0, float(cutoff_freq)))
-        if sample_rate is not None:
+        changed = False
+        if sample_rate is not None and self.sample_rate != int(sample_rate):
             self.sample_rate = int(sample_rate)
-        if abs(self.cutoff_freq - cutoff_freq) > 0.1 or sample_rate is not None:
+            changed = True
+        if order is not None and order in (4, 8) and self.order != int(order):
+            self.order = int(order)
+            changed = True
+        if abs(self.cutoff_freq - cutoff_freq) > 0.1:
             self.cutoff_freq = cutoff_freq
+            changed = True
+        if changed:
             self._design_filters()
 
     def process(self, audio_block: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """Apply LR4 crossover to a stereo float32 audio block of shape (N, 2).
+        """Apply Linkwitz-Riley crossover to a stereo float32 audio block of shape (N, 2).
 
         Returns:
             Tuple of (main_high_pass, bass_low_pass) as float32 arrays of shape (N, 2).
@@ -85,15 +94,13 @@ class LinkwitzRiley4Filter:
         channels = x.shape[1]
         n_sections = self.sos_lp.shape[0]
 
-        # Allocate output arrays
         low_pass = np.empty_like(x)
         high_pass = np.empty_like(x)
 
-        if self.zi_lp is None or self.zi_lp.shape[1] != channels:
+        if self.zi_lp is None or self.zi_lp.shape[1] != channels or self.zi_lp.shape[0] != n_sections:
             self.zi_lp = np.zeros((n_sections, channels, 2), dtype=np.float64)
             self.zi_hp = np.zeros((n_sections, channels, 2), dtype=np.float64)
 
-        # Filter each channel preserving continuous state
         for ch in range(channels):
             lp_ch, self.zi_lp[:, ch, :] = signal.sosfilt(
                 self.sos_lp, x[:, ch], zi=self.zi_lp[:, ch, :]
@@ -112,6 +119,10 @@ class LinkwitzRiley4Filter:
             self.zi_lp.fill(0.0)
         if self.zi_hp is not None:
             self.zi_hp.fill(0.0)
+
+
+# Backward compatibility alias
+LinkwitzRiley4Filter = LinkwitzRileyFilter
 
 
 class DynamicEnvelopeLimiter:
@@ -168,23 +179,28 @@ class DynamicEnvelopeLimiter:
 class AudioDSPProcessor:
     """Complete DSP pipeline including crossover, gains, clarity EQ, and limiter."""
 
-    def __init__(self, sample_rate: int = 48000) -> None:
+    def __init__(self, sample_rate: int = 48000, crossover_order: int = 8) -> None:
         self.sample_rate = int(sample_rate)
-        self.crossover = LinkwitzRiley4Filter(cutoff_freq=120.0, sample_rate=sample_rate)
+        self.crossover_freq: float = 85.0
+        self.crossover_order: int = crossover_order
+        # 48 dB/oct LR8 crossover for brickwall voice isolation (eliminates Netflix/YouTube dialog doubling)
+        self.crossover = LinkwitzRileyFilter(
+            cutoff_freq=self.crossover_freq, sample_rate=sample_rate, order=self.crossover_order
+        )
 
-        # Infrasonic Rumble Filter (35 Hz 2nd-order Butterworth Highpass)
-        self.sos_infra = signal.butter(2, 35.0, btype="high", fs=self.sample_rate, output="sos")
+        # Subsonic Cone Protection Filter (45 Hz 4th-order Butterworth Highpass, 24 dB/oct)
+        # Suppresses 20-35 Hz sub-flutter by up to 28 dB to prevent small portable speaker flapping / paper rattling
+        self.sos_infra = signal.butter(4, 45.0, btype="high", fs=self.sample_rate, output="sos")
         self.zi_infra: Optional[np.ndarray] = None
 
-        # Punch & Clarity Filter (+2.5 dB peak at 70 Hz, Q=1.2)
+        # Tight Bass Punch & Definition Filter (+1.8 dB peak at 75 Hz, Q=1.4)
         self._design_punch_filter()
 
-        # Dynamic Envelope Limiters for clean, distortion-free limiting
+        # Dynamic Envelope Limiters (0.95 for main laptop, 0.88 (-1.1 dBFS) safe ceiling for Bluetooth speakers)
         self.main_limiter = DynamicEnvelopeLimiter(threshold=0.95, sample_rate=self.sample_rate)
-        self.bass_limiter = DynamicEnvelopeLimiter(threshold=0.95, sample_rate=self.sample_rate)
+        self.bass_limiter = DynamicEnvelopeLimiter(threshold=0.88, sample_rate=self.sample_rate)
 
         # Gain staging parameters
-        self.crossover_freq: float = 120.0
         self.bass_gain_db: float = 0.0
         self.main_volume: float = 1.0
         self.bass_volume: float = 1.0
@@ -209,18 +225,18 @@ class AudioDSPProcessor:
     def set_sample_rate(self, sample_rate: int) -> None:
         """Reconfigure DSP filters for a new sampling rate dynamically."""
         self.sample_rate = int(sample_rate)
-        self.crossover.set_crossover(self.crossover_freq, self.sample_rate)
-        self.sos_infra = signal.butter(2, 35.0, btype="high", fs=self.sample_rate, output="sos")
+        self.crossover.set_crossover(self.crossover_freq, self.sample_rate, order=self.crossover_order)
+        self.sos_infra = signal.butter(4, 45.0, btype="high", fs=self.sample_rate, output="sos")
         self.zi_infra = None
         self._design_punch_filter()
         self.main_limiter.sample_rate = self.sample_rate
         self.bass_limiter.sample_rate = self.sample_rate
 
     def _design_punch_filter(self) -> None:
-        """Design 2nd-order peaking EQ at 70 Hz for punch and definition."""
-        f0 = 70.0
-        gain_db = 2.5
-        Q = 1.2
+        """Design 2nd-order peaking EQ at 75 Hz for punch and definition without driver over-excursion."""
+        f0 = 75.0
+        gain_db = 1.8
+        Q = 1.4
         A = 10.0 ** (gain_db / 40.0)
         w0 = 2.0 * np.pi * f0 / max(1, self.sample_rate)
         alpha = np.sin(w0) / (2.0 * Q)
