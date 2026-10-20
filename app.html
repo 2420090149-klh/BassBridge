@@ -439,10 +439,29 @@
                 </div>
             </div>
 
+            <!-- Mobile Phone Speaker Routing Actions -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px;">
+                <button class="btn-pill" style="padding: 10px; background: rgba(0, 240, 255, 0.16); border-color: var(--cyan); color: #fff; font-weight: 700;" onclick="forcePhoneSpeakerMode()">
+                    📱 Force Main to Phone Loudspeaker (Overrides BT)
+                </button>
+                
+                <div id="toggle-channelsplit" class="toggle-btn" onclick="toggleChannelSplit()">
+                    <span class="toggle-icon">🔀</span>
+                    <div>
+                        <div>Stereo Channel Split Mode (Dual-Mono Separation)</div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">Left: Phone / Dialogue • Right: Bluetooth / Sub-Bass</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Endpoint Test Chirps -->
             <div class="btn-row" style="margin-top: 12px;">
-                <button class="btn-pill" onclick="testMainEndpoint()">🔊 Test Main Speaker</button>
-                <button class="btn-pill" onclick="testBassEndpoint()">🔈 Test Bass Speaker</button>
+                <button class="btn-pill" onclick="testMainEndpoint()">🔊 Test Main Speaker (Vocal / Chime)</button>
+                <button class="btn-pill" onclick="testBassEndpoint()">🔈 Test Bass Subwoofer (65Hz Kick)</button>
+            </div>
+
+            <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 8px; line-height: 1.35;">
+                💡 <em>Android Setup:</em> If your phone sends all media to Bluetooth by default, tap <strong>Force Main to Phone Loudspeaker</strong> or enable <strong>Stereo Channel Split</strong>. On Samsung Galaxy, you can also enable <em>Settings → Sounds → Separate App Sound</em>.
             </div>
         </div>
 
@@ -624,8 +643,220 @@
         let discoveredDevices = [];
         let selectedMainDeviceId = 'default';
         let selectedBassDeviceId = 'default';
-        let mainAudioSink = null;
-        let bassAudioSink = null;
+
+        let audioCtx = null;
+        let isEngineRunning = false;
+        let masterGain = null;
+
+        // Separate Main & Bass Filter Nodes
+        let hpFilter1 = null;
+        let hpFilter2 = null;
+        let lpFilter1 = null;
+        let lpFilter2 = null;
+        let infraFilter = null;
+        let dolbyFilter = null;
+        let mainGainNode = null;
+        let bassGainNode = null;
+        let delayNode = null;
+        let analyser = null;
+
+        // Separate Physical Audio Sinks & Streams
+        let mainAudioSinkEl = null;
+        let bassAudioSinkEl = null;
+        let mainStreamDest = null;
+        let bassStreamDest = null;
+        let channelMerger = null;
+        let channelSplitActive = false;
+
+        let activeOsc = null;
+        let pulseTimer = null;
+        let isPulsePlaying = false;
+
+        let currentCrossover = 85;
+        let currentDelayMs = 0;
+        let mainVol = 1.0;
+        let bassVol = 1.0;
+
+        let dolbyEnabled = true;
+        let autoBassEnabled = true;
+        let subsonicEnabled = true;
+        let splitEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)({
+                    latencyHint: 'interactive'
+                });
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            if (!masterGain) {
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 1.0;
+
+                // 1. MAIN AUDIO PATH (Dialogue, High-Pass & Dolby)
+                hpFilter1 = audioCtx.createBiquadFilter();
+                hpFilter1.type = 'highpass';
+                hpFilter1.frequency.value = currentCrossover;
+                hpFilter1.Q.value = 0.7071;
+
+                hpFilter2 = audioCtx.createBiquadFilter();
+                hpFilter2.type = 'highpass';
+                hpFilter2.frequency.value = currentCrossover;
+                hpFilter2.Q.value = 0.7071;
+
+                dolbyFilter = audioCtx.createBiquadFilter();
+                dolbyFilter.type = 'peaking';
+                dolbyFilter.frequency.value = 2400;
+                dolbyFilter.gain.value = 2.0;
+                dolbyFilter.Q.value = 1.2;
+
+                mainGainNode = audioCtx.createGain();
+                mainGainNode.gain.value = mainVol;
+
+                // Connect Main Chain: masterGain -> hp1 -> hp2 -> dolby -> mainGainNode
+                masterGain.connect(hpFilter1);
+                hpFilter1.connect(hpFilter2);
+                hpFilter2.connect(dolbyFilter);
+                dolbyFilter.connect(mainGainNode);
+
+                // 2. BASS AUDIO PATH (Sub-Bass Low-Pass, Subsonic Cut, Delay)
+                lpFilter1 = audioCtx.createBiquadFilter();
+                lpFilter1.type = 'lowpass';
+                lpFilter1.frequency.value = currentCrossover;
+                lpFilter1.Q.value = 0.7071;
+
+                lpFilter2 = audioCtx.createBiquadFilter();
+                lpFilter2.type = 'lowpass';
+                lpFilter2.frequency.value = currentCrossover;
+                lpFilter2.Q.value = 0.7071;
+
+                infraFilter = audioCtx.createBiquadFilter();
+                infraFilter.type = 'highpass';
+                infraFilter.frequency.value = 50;
+                infraFilter.Q.value = 0.7071;
+
+                bassGainNode = audioCtx.createGain();
+                bassGainNode.gain.value = bassVol;
+
+                delayNode = audioCtx.createDelay(1.0);
+                delayNode.delayTime.value = currentDelayMs / 1000.0;
+
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+
+                // Connect Bass Chain: masterGain -> lp1 -> lp2 -> infra -> bassGainNode -> delay -> analyser
+                masterGain.connect(lpFilter1);
+                lpFilter1.connect(lpFilter2);
+                lpFilter2.connect(infraFilter);
+                infraFilter.connect(bassGainNode);
+                bassGainNode.connect(delayNode);
+                delayNode.connect(analyser);
+
+                // 3. PHYSICAL HARDWARE STREAMS
+                mainStreamDest = audioCtx.createMediaStreamDestination();
+                bassStreamDest = audioCtx.createMediaStreamDestination();
+
+                mainGainNode.connect(mainStreamDest);
+                analyser.connect(bassStreamDest);
+
+                mainAudioSinkEl = document.getElementById('main-audio-sink');
+                bassAudioSinkEl = document.getElementById('bass-audio-sink');
+
+                if (mainAudioSinkEl) {
+                    mainAudioSinkEl.srcObject = mainStreamDest.stream;
+                    mainAudioSinkEl.play().catch(() => {});
+                }
+                if (bassAudioSinkEl) {
+                    bassAudioSinkEl.srcObject = bassStreamDest.stream;
+                    bassAudioSinkEl.play().catch(() => {});
+                }
+
+                // 4. STEREO SPLIT CHANNEL MERGER (Left = Main/Dialogue, Right = Bass/Sub)
+                channelMerger = audioCtx.createChannelMerger(2);
+                mainGainNode.connect(channelMerger, 0, 0); // L channel
+                analyser.connect(channelMerger, 0, 1);     // R channel
+                channelMerger.connect(audioCtx.destination);
+
+                // Apply initial routing
+                applyDeviceRouting();
+            }
+        }
+
+        async function applyDeviceRouting() {
+            initAudio();
+            const badge = document.getElementById('routing-mode-badge');
+            let mainRouted = false;
+            let bassRouted = false;
+
+            // Route Main Speaker
+            if (mainAudioSinkEl && typeof mainAudioSinkEl.setSinkId === 'function') {
+                try {
+                    const targetId = (selectedMainDeviceId === 'default') ? '' : selectedMainDeviceId;
+                    await mainAudioSinkEl.setSinkId(targetId);
+                    mainRouted = true;
+                } catch (e) {
+                    console.warn('mainAudioSinkEl.setSinkId error:', e);
+                }
+            }
+
+            // Route Bass Speaker
+            if (bassAudioSinkEl && typeof bassAudioSinkEl.setSinkId === 'function') {
+                try {
+                    const targetId = (selectedBassDeviceId === 'default') ? '' : selectedBassDeviceId;
+                    await bassAudioSinkEl.setSinkId(targetId);
+                    bassRouted = true;
+                } catch (e) {
+                    console.warn('bassAudioSinkEl.setSinkId error:', e);
+                }
+            }
+
+            if (mainRouted && bassRouted && selectedMainDeviceId !== selectedBassDeviceId) {
+                badge.textContent = '✅ Dual Hardware Sinks Active';
+                badge.style.color = 'var(--green)';
+                // Disconnect fallback merger so only discrete hardware sinks output audio
+                try { channelMerger.disconnect(audioCtx.destination); } catch(e) {}
+            } else if (channelSplitActive) {
+                badge.textContent = '🔀 Stereo L/R Channel Split Active';
+                badge.style.color = 'var(--cyan)';
+                try { channelMerger.connect(audioCtx.destination); } catch(e) {}
+            } else {
+                badge.textContent = mainRouted ? '📱 Phone Speaker Sink Active' : 'ℹ️ Standard System Routing';
+                badge.style.color = mainRouted ? 'var(--green)' : 'var(--cyan)';
+                try { channelMerger.connect(audioCtx.destination); } catch(e) {}
+            }
+        }
+
+        async function forcePhoneSpeakerMode() {
+            initAudio();
+            // Look for device with speaker/phone/earpiece in label or id
+            let speakerDev = discoveredDevices.find(d => {
+                const l = (d.label || '').toLowerCase();
+                return l.includes('speaker') || l.includes('phone') || l.includes('earpiece') || l.includes('internal') || d.deviceId === 'speaker' || d.deviceId === 'communications';
+            });
+
+            const selectMain = document.getElementById('select-main-device');
+            if (speakerDev) {
+                selectedMainDeviceId = speakerDev.deviceId;
+                selectMain.value = speakerDev.deviceId;
+                document.getElementById('main-device-label').textContent = speakerDev.label || 'Phone Loudspeaker';
+            } else {
+                selectedMainDeviceId = 'speaker';
+                document.getElementById('main-device-label').textContent = 'Phone Loudspeaker (Forced)';
+            }
+
+            await applyDeviceRouting();
+            testMainEndpoint();
+        }
+
+        function toggleChannelSplit() {
+            channelSplitActive = !channelSplitActive;
+            const toggleEl = document.getElementById('toggle-channelsplit');
+            if (toggleEl) toggleEl.classList.toggle('checked', channelSplitActive);
+            applyDeviceRouting();
+        }
 
         // Auto-detect profile from speaker label
         function detectSpeakerProfile(deviceName) {
@@ -684,7 +915,6 @@
             btn.textContent = '⏳ Scanning Audio Endpoints...';
             
             try {
-                // Request brief audio permission to unmask hardware device labels
                 if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                     try {
                         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -716,13 +946,21 @@
 
                 const defOptBass = document.createElement('option');
                 defOptBass.value = 'default';
-                defOptBass.textContent = 'Default Output (or Bluetooth Companion)';
+                defOptBass.textContent = 'Default / Bluetooth Companion';
                 selectBass.appendChild(defOptBass);
 
                 let autoSelectedBass = false;
 
                 discoveredDevices.forEach((dev, idx) => {
-                    const label = dev.label || `Audio Endpoint ${idx + 1}`;
+                    let label = dev.label || `Audio Endpoint ${idx + 1}`;
+                    const lower = label.toLowerCase();
+
+                    // If phone speaker, format cleanly
+                    if (lower.includes('speaker') || lower.includes('earpiece') || lower.includes('phone') || dev.deviceId === 'speaker' || dev.deviceId === 'communications') {
+                        label = `📱 ${label}`;
+                    } else if (lower.includes('bluetooth') || lower.includes('wireless') || lower.includes('bt')) {
+                        label = `🔊 ${label}`;
+                    }
                     
                     const optMain = document.createElement('option');
                     optMain.value = dev.deviceId;
@@ -735,8 +973,7 @@
                     selectBass.appendChild(optBass);
 
                     // Auto-select Bluetooth / Wireless / Soundbar on bass dropdown if found
-                    const lower = label.toLowerCase();
-                    if (!autoSelectedBass && (lower.includes('bluetooth') || lower.includes('wireless') || lower.includes('speaker') || lower.includes('bar') || lower.includes('soundbar') || lower.includes('bt'))) {
+                    if (!autoSelectedBass && (lower.includes('bluetooth') || lower.includes('wireless') || lower.includes('soundbar') || lower.includes('bt'))) {
                         selectBass.value = dev.deviceId;
                         selectedBassDeviceId = dev.deviceId;
                         document.getElementById('bass-device-label').textContent = label;
@@ -749,9 +986,7 @@
                 btn.style.background = 'rgba(16, 185, 129, 0.15)';
                 btn.style.borderColor = 'var(--green)';
 
-                // Check sink ID support
-                const isSinkSupported = ('setSinkId' in HTMLMediaElement.prototype);
-                document.getElementById('routing-mode-badge').textContent = isSinkSupported ? '✅ Dual Hardware Sinks Active' : 'ℹ️ Stereo Split Mode';
+                applyDeviceRouting();
 
             } catch (err) {
                 console.error('Scan error:', err);
@@ -760,19 +995,21 @@
             }
         }
 
-        function onMainDeviceSelected(deviceId) {
+        async function onMainDeviceSelected(deviceId) {
             selectedMainDeviceId = deviceId;
             const sel = document.getElementById('select-main-device');
             const label = sel.options[sel.selectedIndex].text;
             document.getElementById('main-device-label').textContent = label;
+            await applyDeviceRouting();
         }
 
-        function onBassDeviceSelected(deviceId) {
+        async function onBassDeviceSelected(deviceId) {
             selectedBassDeviceId = deviceId;
             const sel = document.getElementById('select-bass-device');
             const label = sel.options[sel.selectedIndex].text;
             document.getElementById('bass-device-label').textContent = label;
             detectSpeakerProfile(label);
+            await applyDeviceRouting();
         }
 
         function autoDetectCurrentSpeaker() {
@@ -783,6 +1020,7 @@
 
         function testMainEndpoint() {
             initAudio();
+            applyDeviceRouting();
             const now = audioCtx.currentTime;
             const osc = audioCtx.createOscillator();
             const g = audioCtx.createGain();
@@ -791,18 +1029,37 @@
             osc.frequency.setValueAtTime(800, now);
             osc.frequency.exponentialRampToValueAtTime(1600, now + 0.15);
 
-            g.gain.setValueAtTime(0.6 * mainVol, now);
+            g.gain.setValueAtTime(0.8 * mainVol, now);
             g.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
 
             osc.connect(g);
-            g.connect(audioCtx.destination);
+            // Route strictly into main speaker node
+            g.connect(mainGainNode);
+
             osc.start(now);
             osc.stop(now + 0.25);
         }
 
         function testBassEndpoint() {
             initAudio();
-            triggerSyntheticKick(60);
+            applyDeviceRouting();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(95, now);
+            osc.frequency.exponentialRampToValueAtTime(55, now + 0.14);
+
+            g.gain.setValueAtTime(0.85 * bassVol, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+            osc.connect(g);
+            // Route strictly into bass speaker node
+            g.connect(bassGainNode);
+
+            osc.start(now);
+            osc.stop(now + 0.28);
         }
 
         // -------------------------------------------------------------
@@ -850,7 +1107,7 @@
                 const startTime = performance.now();
                 const buf = new Uint8Array(micAnalyser.fftSize);
                 let maxEnergy = 0;
-                let peakTimeOffset = 135; // Default safe estimate
+                let peakTimeOffset = 135;
                 let sampleCount = 0;
 
                 const checkInterval = setInterval(() => {
@@ -871,7 +1128,6 @@
                         clearInterval(checkInterval);
                         stream.getTracks().forEach(t => t.stop());
 
-                        // Constrain measured delay within sensible bounds (30 - 350 ms)
                         const finalDelay = Math.max(30, Math.min(350, peakTimeOffset));
                         updateDelay(finalDelay);
 
@@ -897,89 +1153,6 @@
             }
         }
 
-        // -------------------------------------------------------------
-        // Web Audio Pipeline
-        // -------------------------------------------------------------
-        let audioCtx = null;
-        let isEngineRunning = false;
-        let masterGain = null;
-        let lpFilter1 = null;
-        let lpFilter2 = null;
-        let hpFilter1 = null;
-        let hpFilter2 = null;
-        let infraFilter = null;
-        let dolbyFilter = null;
-        let delayNode = null;
-        let analyser = null;
-
-        let activeOsc = null;
-        let pulseTimer = null;
-        let isPulsePlaying = false;
-
-        let currentCrossover = 85;
-        let currentDelayMs = 0;
-        let mainVol = 1.0;
-        let bassVol = 1.0;
-
-        let dolbyEnabled = true;
-        let autoBassEnabled = true;
-        let subsonicEnabled = true;
-        let splitEnabled = true;
-
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-
-            if (!masterGain) {
-                masterGain = audioCtx.createGain();
-                masterGain.gain.value = 1.0;
-
-                // 4th order Linkwitz-Riley lowpass (two 2nd order Butterworth cascaded)
-                lpFilter1 = audioCtx.createBiquadFilter();
-                lpFilter1.type = 'lowpass';
-                lpFilter1.frequency.value = currentCrossover;
-                lpFilter1.Q.value = 0.7071;
-
-                lpFilter2 = audioCtx.createBiquadFilter();
-                lpFilter2.type = 'lowpass';
-                lpFilter2.frequency.value = currentCrossover;
-                lpFilter2.Q.value = 0.7071;
-
-                // Subsonic 50 Hz rumble cut
-                infraFilter = audioCtx.createBiquadFilter();
-                infraFilter.type = 'highpass';
-                infraFilter.frequency.value = 50;
-                infraFilter.Q.value = 0.7071;
-
-                // Dolby vocal presence EQ at 2.4 kHz (+2 dB)
-                dolbyFilter = audioCtx.createBiquadFilter();
-                dolbyFilter.type = 'peaking';
-                dolbyFilter.frequency.value = 2400;
-                dolbyFilter.gain.value = 2.0;
-                dolbyFilter.Q.value = 1.2;
-
-                // Delay Line
-                delayNode = audioCtx.createDelay(1.0);
-                delayNode.delayTime.value = currentDelayMs / 1000.0;
-
-                // Analyser
-                analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 256;
-
-                // Routing: Master -> Filters -> Analyser -> Destination
-                masterGain.connect(lpFilter1);
-                lpFilter1.connect(lpFilter2);
-                lpFilter2.connect(infraFilter);
-                infraFilter.connect(delayNode);
-                delayNode.connect(analyser);
-                analyser.connect(audioCtx.destination);
-            }
-        }
-
         function toggleAudioEngine() {
             initAudio();
             isEngineRunning = !isEngineRunning;
@@ -993,7 +1166,6 @@
                 playIcon.textContent = '⏹';
                 playText.textContent = 'BASSBRIDGE RUNNING — ACTIVE';
                 statusText.textContent = 'Engine Running';
-                // Start lively groove demo
                 playGrooveDemo();
             } else {
                 btn.style.background = 'linear-gradient(135deg, var(--cyan), #0099FF)';
@@ -1004,7 +1176,7 @@
             }
         }
 
-        // Demo groove synthesizer
+        // Demo groove synthesizer: sends kick to bass and hi-hat/chime to main
         let demoInterval = null;
         function playGrooveDemo() {
             stopDemo();
@@ -1017,9 +1189,12 @@
                 const freq = kickFreqs[step % kickFreqs.length];
                 if (freq > 0) {
                     triggerSyntheticKick(freq);
+                } else {
+                    // Send dialogue/treble chime to main speaker on off-beats
+                    triggerMainChime();
                 }
                 step++;
-            }, 250); // 120 BPM 8th notes
+            }, 250);
         }
 
         function stopDemo() {
@@ -1045,14 +1220,34 @@
             osc.frequency.setValueAtTime(f0 * 1.5, now);
             osc.frequency.exponentialRampToValueAtTime(f0, now + 0.08);
 
-            g.gain.setValueAtTime(0.7 * bassVol, now);
+            g.gain.setValueAtTime(0.75 * bassVol, now);
             g.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
             osc.connect(g);
-            g.connect(masterGain);
+            g.connect(bassGainNode);
 
             osc.start(now);
             osc.stop(now + 0.22);
+        }
+
+        function triggerMainChime() {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(1400, now);
+            osc.frequency.exponentialRampToValueAtTime(900, now + 0.06);
+
+            g.gain.setValueAtTime(0.3 * mainVol, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+            osc.connect(g);
+            g.connect(mainGainNode);
+
+            osc.start(now);
+            osc.stop(now + 0.08);
         }
 
         function toggleSyncPulse() {
@@ -1103,7 +1298,7 @@
                 utter.rate = 1.0;
                 window.speechSynthesis.speak(utter);
             } else {
-                triggerSyncClick();
+                triggerMainChime();
             }
         }
 
@@ -1117,6 +1312,10 @@
             if (lpFilter1 && lpFilter2) {
                 lpFilter1.frequency.value = currentCrossover;
                 lpFilter2.frequency.value = currentCrossover;
+            }
+            if (hpFilter1 && hpFilter2) {
+                hpFilter1.frequency.value = currentCrossover;
+                hpFilter2.frequency.value = currentCrossover;
             }
         }
 
@@ -1141,13 +1340,16 @@
         function updateMainVol(val) {
             mainVol = parseInt(val) / 100.0;
             document.getElementById('main-vol-display').textContent = val + '%';
+            if (mainGainNode) {
+                mainGainNode.gain.value = mainVol;
+            }
         }
 
         function updateBassVol(val) {
             bassVol = parseInt(val) / 100.0;
             document.getElementById('bass-vol-display').textContent = val + '%';
-            if (masterGain) {
-                masterGain.gain.value = bassVol;
+            if (bassGainNode) {
+                bassGainNode.gain.value = bassVol;
             }
         }
 
@@ -1186,7 +1388,7 @@
             }
         }
 
-        // -------------------------------------------------------------
+                // -------------------------------------------------------------
         // Canvas Spectrum Rendering
         // -------------------------------------------------------------
         const canvas = document.getElementById('spectrum-canvas');
@@ -1284,5 +1486,9 @@
             }
         });
     </script>
+
+    <!-- Dedicated Physical Audio Sink Elements for Multi-Device Routing -->
+    <audio id="main-audio-sink" autoplay playsinline style="display:none;"></audio>
+    <audio id="bass-audio-sink" autoplay playsinline style="display:none;"></audio>
 </body>
 </html>

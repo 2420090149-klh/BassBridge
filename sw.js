@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bassbridge-v4';
+const CACHE_NAME = 'bassbridge-v5';
 const STATIC_ASSETS = [
   './',
   './index.html',
