@@ -381,7 +381,8 @@ class AudioEngine:
 
                 # Determine output chunk size
                 frames = self.main_buffer_size
-                block = self.main_buffer.read(frames)
+                target_depth = int(self.main_buffer_size * 1.5)
+                block = self.main_buffer.read_drift_locked(frames, target_depth=target_depth, tolerance=32)
 
                 # If capture device is the loopback of main_device:
                 # The laptop speaker is ALREADY physically playing Windows master audio!
@@ -419,7 +420,8 @@ class AudioEngine:
                     continue
 
                 frames = self.bass_buffer_size
-                block = self.bass_buffer.read(frames)
+                target_depth = int(self.bass_buffer_size * 1.5)
+                block = self.bass_buffer.read_drift_locked(frames, target_depth=target_depth, tolerance=32)
                 data_bytes = block.tobytes()
                 self._bass_out_stream.write(data_bytes)
 

@@ -134,3 +134,39 @@ def test_ring_buffer_prefill_and_clear():
     assert underruns == 0
     assert overruns == 0
 
+def test_ring_buffer_drift_locked():
+    """Verify watermark drift locking corrects buffer over/under fill smoothly."""
+    buf = AudioRingBuffer(capacity_frames=4096, channels=2)
+
+    # 1. Test excess frames (buffer clock slower than write clock):
+    # Prefill with 1000 frames. Target depth = 500, tolerance = 20.
+    buf.write((np.ones((1000, 2)) * 0.8).astype(np.float32))
+    assert buf.available() == 1000
+
+    # Reading 100 frames with target_depth 500 should consume 101 frames from buffer
+    out = buf.read_drift_locked(num_frames=100, target_depth=500, tolerance=20)
+    assert out.shape == (100, 2)
+    assert np.allclose(out, 0.8, atol=1e-5)
+    # Available should decrease by 101 frames: 1000 - 101 = 899
+    assert buf.available() == 899
+
+    # 2. Test deficit frames (buffer clock faster than write clock):
+    # Buffer has 100 frames left. Target depth = 500, tolerance = 20.
+    buf.clear()
+    buf.write((np.ones((100, 2)) * 0.5).astype(np.float32))
+    assert buf.available() == 100
+
+    # Reading 50 frames with target_depth 500 should consume only 49 frames from buffer
+    out2 = buf.read_drift_locked(num_frames=50, target_depth=500, tolerance=20)
+    assert out2.shape == (50, 2)
+    assert np.allclose(out2, 0.5, atol=1e-5)
+    # Available should be: 100 - 49 = 51
+    assert buf.available() == 51
+
+    # 3. Test within tolerance deadband:
+    # Target depth = 50, tolerance = 20. Currently 51 frames are available (within 30-70 deadband).
+    out3 = buf.read_drift_locked(num_frames=20, target_depth=50, tolerance=20)
+    assert out3.shape == (20, 2)
+    # Exactly 20 frames consumed
+    assert buf.available() == 31
+

@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..audio.profiler import SpeakerProfiler
 from ..audio.calibrator import LatencyCalibrator
 from ..audio.devices import AudioDeviceInfo, DeviceManager
 from ..audio.engine import AudioEngine, EngineState
@@ -292,7 +293,14 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(lambda checked=False, d=delta: self.slider_delay.setValue(max(0, min(500, self.slider_delay.value() + d))))
             sync_preset_row.addWidget(btn)
 
-        for label, ms in [("0ms", 0), ("boAt (140)", 140), ("Echo (160)", 160), ("TV (180)", 180)]:
+        btn_auto = QPushButton("⚡ Auto-Detect")
+        btn_auto.setFixedHeight(22)
+        btn_auto.setStyleSheet("font-size: 10px; font-weight: bold; padding: 2px 6px; background: rgba(0,240,255,0.15); border: 1px solid #00F0FF; border-radius: 4px; color: #00F0FF;")
+        btn_auto.setToolTip("Auto-detect speaker hardware type and apply optimal latency and crossover")
+        btn_auto.clicked.connect(lambda checked=False: self._auto_detect_speaker_profile(user_triggered=True))
+        sync_preset_row.addWidget(btn_auto)
+
+        for label, ms in [("0ms Direct", 0), ("Wireless (135ms)", 135), ("Soundbar (170ms)", 170), ("Gaming (45ms)", 45)]:
             btn = QPushButton(label)
             btn.setFixedHeight(22)
             btn.setStyleSheet("font-size: 10px; padding: 2px 4px; background: rgba(0,240,255,0.08); border: 1px solid rgba(0,240,255,0.25); border-radius: 4px; color: #E6EDF3;")
@@ -635,9 +643,7 @@ class MainWindow(QMainWindow):
         if default_dev and (
             default_dev.is_bluetooth or
             (selected_bass_name and default_dev.name.lower() in selected_bass_name.lower()) or
-            "boat" in default_dev.name.lower() or
-            "echo" in default_dev.name.lower() or
-            "stone" in default_dev.name.lower()
+            SpeakerProfiler.detect_profile(default_dev.name).category_id in ("compact_wireless", "soundbar")
         ):
             self.lbl_device_status.setText(
                 f"⚠️ Windows Default Sound is currently '{default_dev.name}'.\n"
@@ -766,9 +772,23 @@ class MainWindow(QMainWindow):
     # Event Handlers
     # ---------------------------------------------------------
 
+    def _auto_detect_speaker_profile(self, user_triggered: bool = True) -> None:
+        """Automatically inspect the selected bass speaker and tune acoustic parameters."""
+        selected_bass_name = self.combo_bass.currentData() or self.combo_bass.currentText() or ""
+        if not selected_bass_name:
+            return
+        profile = SpeakerProfiler.detect_profile(selected_bass_name)
+        self.slider_delay.setValue(profile.recommended_delay_ms)
+        self.slider_crossover.setValue(profile.recommended_crossover_hz)
+        msg = f"⚡ Auto-Detected: {profile.display_title} ({profile.detected_brand_or_model}) → Set {profile.recommended_delay_ms}ms Sync, {profile.recommended_crossover_hz}Hz Crossover"
+        self.status_bar.showMessage(msg, 6000)
+
     def _on_device_selection_changed(self) -> None:
+        prev_bass = self.config.bass_device_name
         self.config.main_device_name = self.combo_main.currentData() or ""
         self.config.bass_device_name = self.combo_bass.currentData() or ""
+        if self.config.bass_device_name and self.config.bass_device_name != prev_bass:
+            self._auto_detect_speaker_profile(user_triggered=False)
         self.config.capture_device_name = self.combo_capture.currentData() or "Default"
 
         self._update_routing_status_label()

@@ -24,6 +24,7 @@ a = Analysis(
         'PySide6.QtCore',
         'PySide6.QtGui',
         'PySide6.QtWidgets',
+        'src.audio.profiler',
     ],
     hookspath=[],
     hooksconfig={},

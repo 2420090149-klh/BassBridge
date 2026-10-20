@@ -104,6 +104,53 @@ class AudioRingBuffer:
             self._available_frames -= num_frames
             return out
 
+    def read_drift_locked(
+        self,
+        num_frames: int,
+        target_depth: int,
+        tolerance: int = 48,
+    ) -> np.ndarray:
+        """Read audio data with elastic watermark phase locking to eradicate clock drift.
+
+        Maintains internal buffer fill level strictly centered around target_depth.
+        If fill level exceeds target_depth + tolerance (output clock is slower),
+        it imperceptibly trims 1 frame per block using smooth linear resampling.
+        If fill level drops below target_depth - tolerance (output clock is faster),
+        it imperceptibly inserts 1 frame per block using smooth linear resampling.
+        """
+        if num_frames <= 0:
+            return np.zeros((0, self.channels), dtype=np.float32)
+
+        with self._lock:
+            avail = self._available_frames
+
+        # Check drift condition
+        if avail > target_depth + tolerance and avail >= num_frames + 1:
+            raw_block = self.read(num_frames + 1)
+            old_indices = np.linspace(0.0, 1.0, num_frames + 1, endpoint=True)
+            new_indices = np.linspace(0.0, 1.0, num_frames, endpoint=True)
+            out = np.empty((num_frames, self.channels), dtype=np.float32)
+            for ch in range(self.channels):
+                out[:, ch] = np.interp(new_indices, old_indices, raw_block[:, ch])
+            return out
+
+        elif avail < target_depth - tolerance and avail >= max(2, num_frames - 1):
+            raw_block = self.read(num_frames - 1)
+            in_len = raw_block.shape[0]
+            if in_len < 2:
+                out = np.zeros((num_frames, self.channels), dtype=np.float32)
+                out[:in_len] = raw_block
+                return out
+            old_indices = np.linspace(0.0, 1.0, in_len, endpoint=True)
+            new_indices = np.linspace(0.0, 1.0, num_frames, endpoint=True)
+            out = np.empty((num_frames, self.channels), dtype=np.float32)
+            for ch in range(self.channels):
+                out[:, ch] = np.interp(new_indices, old_indices, raw_block[:, ch])
+            return out
+
+        else:
+            return self.read(num_frames)
+
     def available(self) -> int:
         """Return number of frames currently buffered."""
         with self._lock:
