@@ -93,6 +93,7 @@ class AudioEngine:
         dolby_dialogue_boost: bool = True,
         dolby_virtual_sub: bool = True,
         dolby_spatial_widen: bool = True,
+        adaptive_bass_enabled: bool = True,
     ) -> None:
         """Update DSP and delay parameters on the fly."""
         self.dsp.update_parameters(
@@ -109,6 +110,7 @@ class AudioEngine:
             dolby_dialogue_boost=dolby_dialogue_boost,
             dolby_virtual_sub=dolby_virtual_sub,
             dolby_spatial_widen=dolby_spatial_widen,
+            adaptive_bass_enabled=adaptive_bass_enabled,
         )
         self.delay_line.set_delay_ms(bass_delay_ms)
 

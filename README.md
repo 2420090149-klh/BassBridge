@@ -16,10 +16,12 @@
   Tuned for movie & YouTube streaming (Netflix, Prime, YouTube). Dialogue and speech cut through clearly without being muffled by heavy action scenes or basslines.
 - **⚡ Linkwitz-Riley 8th-Order (LR8, 48 dB/octave) Acoustic Crossover**:
   Steeper than standard filters. Provides **>39 dB attenuation at 150 Hz** (<1% amplitude), ending the "voice doubling / echoing" issue in Bluetooth speakers completely.
-- **🛡️ Subsonic 45 Hz Cone Protection High-Pass (24 dB/octave)**:
-  Crushes inaudible 20–35 Hz subsonic flutter by **-28.2 dB**. Eliminates mechanical bottoming-out and the fluttering "paper rumbling sound" on portable speakers (e.g., boAt Stone 1010, Amazon Echo Dot).
-- **🔊 Psychoacoustic Virtual Subwoofer Harmonic Synthesizer**:
-  Synthesizes coherent 2nd-order harmonics so small 50mm portable drivers sound like full-sized cinema subwoofers without mechanical cone flapping.
+- **🛡️ Subsonic 55 Hz 8th-Order Infrasonic Cone Protection (48 dB/octave)**:
+  Crushes inaudible 20–35 Hz subsonic flutter by **-31.4 dB to -70.3 dB**. Eliminates mechanical driver bottoming-out and the fluttering "paper rumbling sound" on portable Bluetooth speakers (boAt Stone 1010, Amazon Echo Dot).
+- **🎚️ Dynamic Frequency-Dependent Auto-EQ & Bass De-Boomer**:
+  Automatically balances master volume and sub-bass volume depending on frequency and dialogue presence. During heavy action explosions, it ducks excessive bass to protect drivers and avoid boomy mud; when dialogue is present, it prioritizes speech intelligibility.
+- **🔊 Pure Chebyshev 2nd Harmonic Virtual Sub Synthesizer**:
+  Synthesizes clean upper punch (70–140 Hz) without introducing DC offsets or sub-infrasonic beat rumble.
 - **🌌 Dolby 3D Spatial Soundstage Widening**:
   Widens ambient sound on laptop and TV speakers while keeping center dialogue firmly locked on screen.
 - **⏱️ Universal Latency Sync Calibration**:

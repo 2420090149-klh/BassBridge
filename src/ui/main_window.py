@@ -379,6 +379,14 @@ class MainWindow(QMainWindow):
         self.chk_split.toggled.connect(self._on_parameter_changed)
         toggles_row.addWidget(self.chk_split)
 
+        self.chk_adaptive = QCheckBox("🎚️ Auto-Bass & De-Boom")
+        self.chk_adaptive.setChecked(self.config.adaptive_bass_enabled)
+        self.chk_adaptive.setToolTip(
+            "Automatically adjusts device and bass volume depending on frequency and dialogue presence, eliminating extra unnecessary bass."
+        )
+        self.chk_adaptive.toggled.connect(self._on_parameter_changed)
+        toggles_row.addWidget(self.chk_adaptive)
+
         toggles_row.addStretch()
 
         self.btn_mute_bass = QPushButton("Mute Bass")
@@ -668,6 +676,7 @@ class MainWindow(QMainWindow):
         self.slider_main_vol.blockSignals(True)
         self.slider_bass_vol.blockSignals(True)
         self.chk_split.blockSignals(True)
+        self.chk_adaptive.blockSignals(True)
         self.btn_mute_bass.blockSignals(True)
         self.chk_dolby.blockSignals(True)
         self.chk_clarity.blockSignals(True)
@@ -701,6 +710,7 @@ class MainWindow(QMainWindow):
         self.slider_main_vol.blockSignals(False)
         self.slider_bass_vol.blockSignals(False)
         self.chk_split.blockSignals(False)
+        self.chk_adaptive.blockSignals(False)
         self.btn_mute_bass.blockSignals(False)
         self.chk_dolby.blockSignals(False)
         self.chk_clarity.blockSignals(False)
@@ -724,6 +734,7 @@ class MainWindow(QMainWindow):
         self.config.dolby_dialogue_boost = self.chk_dolby.isChecked()
         self.config.dolby_virtual_sub = self.chk_dolby.isChecked()
         self.config.dolby_spatial_widen = self.chk_dolby.isChecked()
+        self.config.adaptive_bass_enabled = self.chk_adaptive.isChecked()
 
         self.engine.set_parameters(
             crossover_freq=self.config.crossover_freq,
@@ -739,6 +750,7 @@ class MainWindow(QMainWindow):
             dolby_dialogue_boost=self.config.dolby_dialogue_boost,
             dolby_virtual_sub=self.config.dolby_virtual_sub,
             dolby_spatial_widen=self.config.dolby_spatial_widen,
+            adaptive_bass_enabled=self.config.adaptive_bass_enabled,
         )
 
 

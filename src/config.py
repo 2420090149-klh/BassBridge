@@ -87,6 +87,7 @@ class AppConfig:
     dolby_dialogue_boost: bool = True    # Dolby-style +2dB 2.4kHz vocal presence
     dolby_virtual_sub: bool = True       # Psychoacoustic 2nd harmonic sub synthesizer
     dolby_spatial_widen: bool = True     # Dolby soundstage widening on main speakers
+    adaptive_bass_enabled: bool = True   # Auto frequency-dependent EQ & bass de-booming
 
 
     # Performance and buffer
@@ -112,6 +113,7 @@ class AppConfig:
         self.dolby_dialogue_boost = bool(self.dolby_dialogue_boost)
         self.dolby_virtual_sub = bool(self.dolby_virtual_sub)
         self.dolby_spatial_widen = bool(self.dolby_spatial_widen)
+        self.adaptive_bass_enabled = bool(self.adaptive_bass_enabled)
         if self.buffer_size not in (256, 512, 1024, 2048, 4096):
             self.buffer_size = 1024
 

@@ -289,3 +289,30 @@ def test_dolby_virtual_sub_harmonic_generation():
     idx_70 = np.argmin(np.abs(freqs - 70.0))
     # Harmonic power at 70 Hz should be significant (> 0.05)
     assert fft_mag[idx_70] > 1.0, f"Virtual sub harmonic missing at 70 Hz: {fft_mag[idx_70]}"
+
+
+def test_adaptive_frequency_manager_excessive_bass_attenuation():
+    """Verify that AdaptiveFrequencyManager automatically compresses excessive unnecessary bass."""
+    dsp = AudioDSPProcessor(sample_rate=48000)
+    dsp.update_parameters(
+        crossover_freq=85.0,
+        bass_gain_db=0.0,
+        main_volume=1.0,
+        bass_volume=1.0,
+        bass_muted=False,
+        bass_split_enabled=True,
+        adaptive_bass_enabled=True,
+    )
+    dsp.reset()
+
+    t = np.arange(4800) / 48000.0
+    # Overly loud 70 Hz kick/sub explosion (amplitude 0.8)
+    loud_70 = (0.8 * np.sin(2 * np.pi * 70 * t)).astype(np.float32)
+    stereo_loud = np.column_stack((loud_70, loud_70))
+
+    # Process first block to trigger adaptive de-boomer
+    dsp.process_block(stereo_loud[:1024])
+    _, bass_out2 = dsp.process_block(stereo_loud[1024:2048])
+
+    # Bass gain should have automatically adapted downward (< 0.80) to eliminate unnecessary bass overload
+    assert dsp.adaptive_mgr.curr_bass_atten < 0.80, f"Expected bass ducking below 0.80, got {dsp.adaptive_mgr.curr_bass_atten:.3f}"
