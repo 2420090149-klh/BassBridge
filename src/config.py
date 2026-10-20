@@ -84,6 +84,9 @@ class AppConfig:
     bass_clarity_enabled: bool = True    # Tight punch & vocal mud reduction
     infrasonic_cut_enabled: bool = True  # Cut < 45 Hz sub-flutter for speaker cone protection
     bass_phase_inverted: bool = False    # 0 deg vs 180 deg acoustic phase flip
+    dolby_dialogue_boost: bool = True    # Dolby-style +2dB 2.4kHz vocal presence
+    dolby_virtual_sub: bool = True       # Psychoacoustic 2nd harmonic sub synthesizer
+    dolby_spatial_widen: bool = True     # Dolby soundstage widening on main speakers
 
 
     # Performance and buffer
@@ -106,6 +109,9 @@ class AppConfig:
         self.bass_clarity_enabled = bool(self.bass_clarity_enabled)
         self.infrasonic_cut_enabled = bool(self.infrasonic_cut_enabled)
         self.bass_phase_inverted = bool(self.bass_phase_inverted)
+        self.dolby_dialogue_boost = bool(self.dolby_dialogue_boost)
+        self.dolby_virtual_sub = bool(self.dolby_virtual_sub)
+        self.dolby_spatial_widen = bool(self.dolby_spatial_widen)
         if self.buffer_size not in (256, 512, 1024, 2048, 4096):
             self.buffer_size = 1024
 

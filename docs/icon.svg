@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#141B2D"/>
+      <stop offset="100%" stop-color="#07090E"/>
+    </radialGradient>
+    <radialGradient id="cyanGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#00F0FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="neonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF"/>
+      <stop offset="100%" stop-color="#A855F7"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="210" fill="none" stroke="url(#neonGrad)" stroke-width="6" opacity="0.6"/>
+  <circle cx="256" cy="256" r="175" fill="#0E131F" stroke="#00F0FF" stroke-width="4"/>
+  <circle cx="256" cy="256" r="115" fill="#141B2D" stroke="#A855F7" stroke-width="5"/>
+  <circle cx="256" cy="256" r="50" fill="url(#neonGrad)"/>
+  <path d="M 120 256 Q 256 160 392 256" fill="none" stroke="#00F0FF" stroke-width="4" stroke-dasharray="8 8" opacity="0.7"/>
+  <path d="M 140 256 Q 256 340 372 256" fill="none" stroke="#A855F7" stroke-width="4" stroke-dasharray="8 8" opacity="0.7"/>
+</svg>

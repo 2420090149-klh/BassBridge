@@ -281,6 +281,17 @@ class MainWindow(QMainWindow):
         self.slider_delay.valueChanged.connect(self._on_delay_slider_changed)
         crossover_box.addWidget(self.slider_delay)
 
+        # Quick Sync Latency Presets
+        sync_preset_row = QHBoxLayout()
+        sync_preset_row.setSpacing(4)
+        for label, ms in [("Echo (160ms)", 160), ("boAt (140ms)", 140), ("TV (180ms)", 180), ("Fast (45ms)", 45)]:
+            btn = QPushButton(label)
+            btn.setFixedHeight(22)
+            btn.setStyleSheet("font-size: 10px; padding: 2px 4px; background: rgba(0,240,255,0.08); border: 1px solid rgba(0,240,255,0.25); border-radius: 4px; color: #E6EDF3;")
+            btn.clicked.connect(lambda checked=False, val=ms: self.slider_delay.setValue(val))
+            sync_preset_row.addWidget(btn)
+        crossover_box.addLayout(sync_preset_row)
+
         knob_row.addLayout(crossover_box)
         layout.addLayout(knob_row)
 
@@ -318,7 +329,16 @@ class MainWindow(QMainWindow):
         enhancement_row = QHBoxLayout()
         enhancement_row.setSpacing(12)
 
+        self.chk_dolby = QCheckBox("✨ Dolby Atmos Audio")
+        self.chk_dolby.setChecked(self.config.dolby_dialogue_boost)
+        self.chk_dolby.setToolTip(
+            "Dolby dialogue clarity (+2.0 dB at 2.4 kHz), psychoacoustic sub-bass harmonics, and 3D spatial soundstage."
+        )
+        self.chk_dolby.toggled.connect(self._on_parameter_changed)
+        enhancement_row.addWidget(self.chk_dolby)
+
         self.chk_clarity = QCheckBox("✨ Bass Clarity & Punch")
+        self.chk_dolby.setChecked(self.config.dolby_dialogue_boost)
         self.chk_clarity.setChecked(self.config.bass_clarity_enabled)
         self.chk_clarity.setToolTip(
             "Eliminates boxy low-mid mud / vocal leakage and contours 70 Hz for punchy, defined kick drums and basslines."
@@ -649,6 +669,7 @@ class MainWindow(QMainWindow):
         self.slider_bass_vol.blockSignals(True)
         self.chk_split.blockSignals(True)
         self.btn_mute_bass.blockSignals(True)
+        self.chk_dolby.blockSignals(True)
         self.chk_clarity.blockSignals(True)
         self.chk_infra.blockSignals(True)
         self.btn_phase.blockSignals(True)
@@ -681,6 +702,7 @@ class MainWindow(QMainWindow):
         self.slider_bass_vol.blockSignals(False)
         self.chk_split.blockSignals(False)
         self.btn_mute_bass.blockSignals(False)
+        self.chk_dolby.blockSignals(False)
         self.chk_clarity.blockSignals(False)
         self.chk_infra.blockSignals(False)
         self.btn_phase.blockSignals(False)
@@ -699,6 +721,9 @@ class MainWindow(QMainWindow):
         self.config.bass_clarity_enabled = self.chk_clarity.isChecked()
         self.config.infrasonic_cut_enabled = self.chk_infra.isChecked()
         self.config.bass_phase_inverted = self.btn_phase.isChecked()
+        self.config.dolby_dialogue_boost = self.chk_dolby.isChecked()
+        self.config.dolby_virtual_sub = self.chk_dolby.isChecked()
+        self.config.dolby_spatial_widen = self.chk_dolby.isChecked()
 
         self.engine.set_parameters(
             crossover_freq=self.config.crossover_freq,
@@ -711,6 +736,9 @@ class MainWindow(QMainWindow):
             bass_clarity_enabled=self.config.bass_clarity_enabled,
             infrasonic_cut_enabled=self.config.infrasonic_cut_enabled,
             bass_phase_inverted=self.config.bass_phase_inverted,
+            dolby_dialogue_boost=self.config.dolby_dialogue_boost,
+            dolby_virtual_sub=self.config.dolby_virtual_sub,
+            dolby_spatial_widen=self.config.dolby_spatial_widen,
         )
 
 

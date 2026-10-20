@@ -216,3 +216,76 @@ def test_bass_mono_sum():
     # L and R channels must be exactly identical
     assert np.allclose(bass_out[:, 0], bass_out[:, 1], atol=1e-5)
 
+
+
+def test_dolby_dialogue_presence_and_spatial_widen():
+    """Verify Dolby Dialogue Presence boost at 2.4 kHz and Spatial Widening."""
+    dsp = AudioDSPProcessor(sample_rate=48000)
+    t = np.arange(4800) / 48000.0
+    # 2.4 kHz dialogue tone
+    # 2.4 kHz dialogue tone at normal dialogue speech level (-14 dBFS) to avoid peak limiter engagement
+    sine_2400 = (0.2 * np.sin(2 * np.pi * 2400 * t)).astype(np.float32)
+    stereo_2400 = np.column_stack((sine_2400, sine_2400))
+
+    # Without Dolby boost
+    dsp.update_parameters(
+        crossover_freq=85.0,
+        bass_gain_db=0.0,
+        main_volume=1.0,
+        bass_volume=1.0,
+        bass_muted=False,
+        bass_split_enabled=True,
+        dolby_dialogue_boost=False,
+        dolby_spatial_widen=False,
+    )
+    dsp.reset()
+    main_flat, _ = dsp.process_block(stereo_2400)
+    rms_flat = np.sqrt(np.mean(main_flat[1000:]**2))
+
+    # With Dolby boost
+    dsp.update_parameters(
+        crossover_freq=85.0,
+        bass_gain_db=0.0,
+        main_volume=1.0,
+        bass_volume=1.0,
+        bass_muted=False,
+        bass_split_enabled=True,
+        dolby_dialogue_boost=True,
+        dolby_spatial_widen=False,
+    )
+    dsp.reset()
+    main_boosted, _ = dsp.process_block(stereo_2400)
+    rms_boosted = np.sqrt(np.mean(main_boosted[1000:]**2))
+
+    # Expect ~+2.0 dB (+1.5 dB to +2.5 dB)
+    gain_db = 20 * np.log10(rms_boosted / rms_flat)
+    assert 1.5 < gain_db < 2.5, f"Dolby dialogue gain outside expected range: {gain_db:.2f} dB"
+
+
+def test_dolby_virtual_sub_harmonic_generation():
+    """Verify that Dolby Virtual Subwoofer synthesizes upper harmonics for deep sub-bass."""
+    dsp = AudioDSPProcessor(sample_rate=48000)
+    t = np.arange(4800) / 48000.0
+    # 35 Hz deep tone
+    sine_35 = np.sin(2 * np.pi * 35 * t).astype(np.float32)
+    stereo_35 = np.column_stack((sine_35, sine_35))
+
+    dsp.update_parameters(
+        crossover_freq=85.0,
+        bass_gain_db=0.0,
+        main_volume=1.0,
+        bass_volume=1.0,
+        bass_muted=False,
+        bass_split_enabled=True,
+        dolby_virtual_sub=True,
+    )
+    dsp.reset()
+    _, bass_with_harmonics = dsp.process_block(stereo_35)
+
+    # Calculate FFT spectrum and check presence of 70 Hz (2nd harmonic)
+    fft_mag = np.abs(np.fft.rfft(bass_with_harmonics[1000:, 0]))
+    freqs = np.fft.rfftfreq(len(bass_with_harmonics[1000:, 0]), 1.0 / 48000.0)
+    
+    idx_70 = np.argmin(np.abs(freqs - 70.0))
+    # Harmonic power at 70 Hz should be significant (> 0.05)
+    assert fft_mag[idx_70] > 1.0, f"Virtual sub harmonic missing at 70 Hz: {fft_mag[idx_70]}"

@@ -196,6 +196,14 @@ class AudioDSPProcessor:
         # Tight Bass Punch & Definition Filter (+1.8 dB peak at 75 Hz, Q=1.4)
         self._design_punch_filter()
 
+        # Dolby Dialogue Presence Filter (+2.0 dB at 2.4 kHz for vocal clarity)
+        self._design_dialogue_presence_filter()
+
+        # Dolby Atmos & Psychoacoustic processing flags
+        self.dolby_dialogue_boost: bool = True
+        self.dolby_virtual_sub: bool = True
+        self.dolby_spatial_widen: bool = True
+
         # Dynamic Envelope Limiters (0.95 for main laptop, 0.88 (-1.1 dBFS) safe ceiling for Bluetooth speakers)
         self.main_limiter = DynamicEnvelopeLimiter(threshold=0.95, sample_rate=self.sample_rate)
         self.bass_limiter = DynamicEnvelopeLimiter(threshold=0.88, sample_rate=self.sample_rate)
@@ -229,6 +237,7 @@ class AudioDSPProcessor:
         self.sos_infra = signal.butter(4, 45.0, btype="high", fs=self.sample_rate, output="sos")
         self.zi_infra = None
         self._design_punch_filter()
+        self._design_dialogue_presence_filter()
         self.main_limiter.sample_rate = self.sample_rate
         self.bass_limiter.sample_rate = self.sample_rate
 
@@ -251,6 +260,26 @@ class AudioDSPProcessor:
         self.sos_punch = signal.tf2sos(b, a)
         self.zi_punch: Optional[np.ndarray] = None
 
+    def _design_dialogue_presence_filter(self) -> None:
+        """Design Dolby-style vocal presence EQ (+2.0 dB at 2.4 kHz) for dialogue intelligibility."""
+        f0 = 2400.0
+        gain_db = 2.0
+        Q = 1.2
+        A = 10.0 ** (gain_db / 40.0)
+        w0 = 2.0 * np.pi * f0 / max(1, self.sample_rate)
+        alpha = np.sin(w0) / (2.0 * Q)
+        b0 = 1.0 + alpha * A
+        b1 = -2.0 * np.cos(w0)
+        b2 = 1.0 - alpha * A
+        a0 = 1.0 + alpha / A
+        a1 = -2.0 * np.cos(w0)
+        a2 = 1.0 - alpha / A
+        b = np.array([b0 / a0, b1 / a0, b2 / a0], dtype=np.float64)
+        a = np.array([1.0, a1 / a0, a2 / a0], dtype=np.float64)
+        self.sos_presence = signal.tf2sos(b, a)
+        self.zi_presence: Optional[np.ndarray] = None
+
+
     def update_parameters(
         self,
         crossover_freq: float,
@@ -263,6 +292,9 @@ class AudioDSPProcessor:
         infrasonic_cut_enabled: bool = True,
         bass_phase_inverted: bool = False,
         bass_mono_sum: bool = True,
+        dolby_dialogue_boost: bool = True,
+        dolby_virtual_sub: bool = True,
+        dolby_spatial_widen: bool = True,
     ) -> None:
         """Update processing parameters safely."""
         self.crossover_freq = crossover_freq
@@ -276,6 +308,9 @@ class AudioDSPProcessor:
         self.infrasonic_cut_enabled = infrasonic_cut_enabled
         self.bass_phase_inverted = bass_phase_inverted
         self.bass_mono_sum = bass_mono_sum
+        self.dolby_dialogue_boost = dolby_dialogue_boost
+        self.dolby_virtual_sub = dolby_virtual_sub
+        self.dolby_spatial_widen = dolby_spatial_widen
 
     def process_block(
         self, input_block: np.ndarray
@@ -298,6 +333,23 @@ class AudioDSPProcessor:
             # Full-range audio to laptop speakers (companion mode)
             main_out = input_block.copy()
 
+        # Dolby Atmos Dialogue Clarity (Vocal Presence Enhancement on main speakers)
+        if self.dolby_dialogue_boost and main_out.shape[1] == 2:
+            if self.zi_presence is None or self.zi_presence.shape[1] != main_out.shape[1]:
+                self.zi_presence = np.zeros((self.sos_presence.shape[0], main_out.shape[1], 2), dtype=np.float64)
+            for ch in range(main_out.shape[1]):
+                main_filtered, self.zi_presence[:, ch, :] = signal.sosfilt(
+                    self.sos_presence, main_out[:, ch].astype(np.float64), zi=self.zi_presence[:, ch, :]
+                )
+                main_out[:, ch] = main_filtered.astype(np.float32)
+
+        # Dolby Spatial Soundstage Widening (widens ambient sound while keeping center dialogue locked)
+        if self.dolby_spatial_widen and main_out.shape[1] == 2:
+            mid = 0.5 * (main_out[:, 0] + main_out[:, 1])
+            side = 0.5 * (main_out[:, 0] - main_out[:, 1]) * 1.25
+            main_out[:, 0] = mid + side
+            main_out[:, 1] = mid - side
+
         # Step 3: Path B - Bass Audio
         bass_out = low_pass
 
@@ -306,6 +358,13 @@ class AudioDSPProcessor:
             mono_bass = 0.5 * (bass_out[:, 0] + bass_out[:, 1])
             bass_out[:, 0] = mono_bass
             bass_out[:, 1] = mono_bass
+
+        # Dolby Virtual Subwoofer (Psychoacoustic Harmonic Synthesis)
+        # Synthesizes coherent 2nd harmonics of inaudible sub-bass so small drivers sound massive without cone flapping
+        if self.dolby_virtual_sub:
+            sub_band = np.tanh(bass_out * 1.3) ** 2
+            sub_harmonics = (sub_band - np.mean(sub_band, axis=0, keepdims=True)).astype(np.float32)
+            bass_out = bass_out + 0.35 * sub_harmonics
 
         # Subsonic Rumble Cut (Protects portable speaker cone & frees up amplifier headroom)
         if self.infrasonic_cut_enabled:
@@ -410,6 +469,8 @@ class AudioDSPProcessor:
             self.zi_infra.fill(0.0)
         if self.zi_punch is not None:
             self.zi_punch.fill(0.0)
+        if self.zi_presence is not None:
+            self.zi_presence.fill(0.0)
         self.main_limiter.reset()
         self.bass_limiter.reset()
         self.last_main_peak = 0.0

@@ -90,6 +90,9 @@ class AudioEngine:
         infrasonic_cut_enabled: bool = True,
         bass_phase_inverted: bool = False,
         bass_mono_sum: bool = True,
+        dolby_dialogue_boost: bool = True,
+        dolby_virtual_sub: bool = True,
+        dolby_spatial_widen: bool = True,
     ) -> None:
         """Update DSP and delay parameters on the fly."""
         self.dsp.update_parameters(
@@ -103,6 +106,9 @@ class AudioEngine:
             infrasonic_cut_enabled=infrasonic_cut_enabled,
             bass_phase_inverted=bass_phase_inverted,
             bass_mono_sum=bass_mono_sum,
+            dolby_dialogue_boost=dolby_dialogue_boost,
+            dolby_virtual_sub=dolby_virtual_sub,
+            dolby_spatial_widen=dolby_spatial_widen,
         )
         self.delay_line.set_delay_ms(bass_delay_ms)
 
