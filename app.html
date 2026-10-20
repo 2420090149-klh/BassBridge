@@ -11,6 +11,8 @@
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="BassBridge">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="BassBridge">
@@ -377,9 +379,14 @@
             <img src="icon.svg" alt="BassBridge" style="width: 28px; height: 28px;">
             <span>BassBridge</span>
         </div>
-        <div id="engine-status" class="status-pill">
-            <span class="status-dot"></span>
-            <span id="status-text">Audio DSP Ready</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button id="btn-install-header" class="btn-pill" style="padding: 5px 10px; font-size: 0.75rem; background: rgba(0, 240, 255, 0.15); border-color: var(--cyan); color: #fff; font-weight: 700;" onclick="handleInstallClick()">
+                📲 Add to App
+            </button>
+            <div id="engine-status" class="status-pill">
+                <span class="status-dot"></span>
+                <span id="status-text">Audio DSP Ready</span>
+            </div>
         </div>
     </header>
 
@@ -390,6 +397,27 @@
             <span id="play-text">START BASSBRIDGE AUDIO</span>
         </button>
 
+
+        <!-- PWA / Samsung Internet Install Banner -->
+        <div id="pwa-install-card" class="card" style="background: linear-gradient(135deg, rgba(0, 240, 255, 0.12), rgba(168, 85, 247, 0.12)); border-color: var(--cyan); padding: 12px 16px; margin-bottom: 2px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <div>
+                    <div style="font-weight: 800; font-size: 0.92rem; color: #fff; display: flex; align-items: center; gap: 6px;">
+                        <span>📲</span>
+                        <span>Add BassBridge to Your Apps (Samsung / Phone)</span>
+                    </div>
+                    <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 2px;">
+                        Run fullscreen without browser address bar directly on your phone & TV
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-pill" style="background: var(--cyan); color: #000; font-weight: 800; padding: 7px 13px;" onclick="handleInstallClick()">
+                        Add to App Screen
+                    </button>
+                    <button class="btn-pill" style="padding: 7px 10px;" onclick="dismissInstallCard()">✕</button>
+                </div>
+            </div>
+        </div>
 
         <!-- Audio Output Device Routing Card -->
         <div class="card" id="card-devices">
@@ -637,6 +665,55 @@
         }
 
         
+        
+        // -------------------------------------------------------------
+        // PWA & Samsung Internet Installation Handler
+        // -------------------------------------------------------------
+        let deferredPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const btn = document.getElementById('btn-install-header');
+            if (btn) btn.style.display = 'inline-flex';
+            const card = document.getElementById('pwa-install-card');
+            if (card) card.style.display = 'block';
+        });
+
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            const card = document.getElementById('pwa-install-card');
+            if (card) card.style.display = 'none';
+        });
+
+        async function handleInstallClick() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    deferredPrompt = null;
+                    dismissInstallCard();
+                }
+            } else {
+                showInstallGuide();
+            }
+        }
+
+        function showInstallGuide() {
+            const modal = document.getElementById('install-guide-modal');
+            if (modal) modal.style.display = 'flex';
+        }
+
+        function closeInstallGuide() {
+            const modal = document.getElementById('install-guide-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function dismissInstallCard() {
+            const card = document.getElementById('pwa-install-card');
+            if (card) card.style.display = 'none';
+        }
+
         // -------------------------------------------------------------
         // Multi-Device Routing & Audio Hardware Management
         // -------------------------------------------------------------
@@ -1490,5 +1567,41 @@
     <!-- Dedicated Physical Audio Sink Elements for Multi-Device Routing -->
     <audio id="main-audio-sink" autoplay playsinline style="display:none;"></audio>
     <audio id="bass-audio-sink" autoplay playsinline style="display:none;"></audio>
+
+    <!-- Samsung Internet & Mobile Install Guide Modal -->
+    <div id="install-guide-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; padding: 18px;">
+        <div class="card" style="max-width: 440px; width: 100%; border-color: var(--cyan); box-shadow: 0 0 35px var(--cyan-glow); padding: 22px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+                <div style="font-size: 1.05rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 8px;">
+                    <span>📲</span>
+                    <span>Add to App in Samsung Internet</span>
+                </div>
+                <button class="btn-pill" style="min-width: 32px; padding: 4px 8px;" onclick="closeInstallGuide()">✕</button>
+            </div>
+            
+            <p style="font-size: 0.84rem; color: #E2E8F0; margin-bottom: 14px; line-height: 1.45;">
+                In Samsung Internet on Galaxy phones and TVs, follow these steps:
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
+                <div style="background: rgba(0, 240, 255, 0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(0, 240, 255, 0.3); font-size: 0.84rem;">
+                    <strong style="color: var(--cyan);">Method 1 (Instant — Address Bar):</strong><br>
+                    Look at the top URL bar. Tap the <strong>⬇️ (Install / Download)</strong> icon on the right side next to the link!
+                </div>
+
+                <div style="background: rgba(168, 85, 247, 0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(168, 85, 247, 0.3); font-size: 0.84rem;">
+                    <strong style="color: var(--purple);">Method 2 (Samsung Menu):</strong><br>
+                    1. Tap the <strong>☰ Menu</strong> button in the bottom-right corner.<br>
+                    2. Tap <strong>"Add page to"</strong> (or <strong>+</strong>).<br>
+                    3. Tap <strong>"App screen"</strong> (or "Home screen").
+                </div>
+            </div>
+
+            <button class="btn-play-engine" style="padding: 12px; font-size: 0.9rem;" onclick="closeInstallGuide()">
+                Got It, Open Menu
+            </button>
+        </div>
+    </div>
+
 </body>
 </html>

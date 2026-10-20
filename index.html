@@ -12,6 +12,8 @@
     <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
     <link rel="icon" type="image/svg+xml" href="icon.svg">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="BassBridge">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="BassBridge">
@@ -1415,10 +1417,12 @@ python main.py</div>
                 deferredPrompt.prompt();
             } else {
                 const ua = navigator.userAgent.toLowerCase();
-                if (ua.includes('iphone') || ua.includes('ipad')) {
+                if (ua.includes('samsung') || ua.includes('samsungbrowser')) {
+                    alert('To install in Samsung Internet:\n1. Look at the top URL bar: tap the ⬇️ (Install) icon next to the address!\n2. OR tap the ☰ Menu (bottom-right) → "Add page to" → "App screen" (or "Home screen")!');
+                } else if (ua.includes('iphone') || ua.includes('ipad')) {
                     alert('To install on iPhone/iPad: Tap the Share button (⎋) in Safari and choose "Add to Home Screen" (+)!');
                 } else {
-                    alert('To install BassBridge as an App: Open your browser menu (⋮) and tap "Install app" or "Add to Home screen"!');
+                    alert('To install BassBridge as an App:\n• Chrome: Tap (⋮) → "Install app"\n• Samsung Internet: Tap ☰ → "Add page to" → "App screen"');
                 }
             }
         }

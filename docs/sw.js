@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bassbridge-v5';
+const CACHE_NAME = 'bassbridge-v6';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -12,8 +12,14 @@ const STATIC_ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(STATIC_ASSETS);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      for (const asset of STATIC_ASSETS) {
+        try {
+          await cache.add(asset);
+        } catch (err) {
+          console.warn('Non-fatal cache miss for:', asset, err);
+        }
+      }
     })
   );
   self.skipWaiting();
@@ -49,7 +55,8 @@ self.addEventListener('fetch', (event) => {
         return cachedResponse;
       }
       return fetch(event.request).catch(() => {
-        if (event.request.headers.get('accept').includes('text/html')) {
+        const accept = event.request.headers.get('accept') || '';
+        if (accept.includes('text/html')) {
           return caches.match('./app.html') || caches.match('./index.html');
         }
       });

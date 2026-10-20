@@ -1,6 +1,7 @@
 {
-  "name": "BassBridge — Dolby Atmos Bass Companion",
+  "name": "BassBridge \u2014 Dolby Atmos Bass Companion",
   "short_name": "BassBridge",
+  "id": "bassbridge-audio-app",
   "description": "Turn any Bluetooth speaker into a wireless Dolby Atmos subwoofer with zero dialogue bleed and real-time sync calibration.",
   "start_url": "./app.html",
   "scope": "./",
@@ -8,25 +9,42 @@
   "orientation": "any",
   "background_color": "#07090E",
   "theme_color": "#00F0FF",
+  "prefer_related_applications": false,
   "icons": [
     {
-      "src": "icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "icon.svg",
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     }
   ],
-  "categories": ["music", "entertainment", "utilities"]
+  "categories": [
+    "music",
+    "entertainment",
+    "utilities"
+  ]
 }
