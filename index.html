@@ -912,6 +912,7 @@
             </a>
 
             <div class="nav-links">
+                <a href="app.html" class="nav-link" style="color: var(--cyan); font-weight: 700;">📱 Launch App</a>
                 <a href="#dolby-clarity" class="nav-link">Dolby Clarity</a>
                 <a href="#smart-tv" class="nav-link">Smart TV & Mobile</a>
                 <a href="#sync-tool" class="nav-link">Sync Calibrator</a>
@@ -944,15 +945,16 @@
             </p>
 
             <div class="hero-actions">
+                <a href="app.html" class="btn-primary" style="background: linear-gradient(135deg, #10B981, #059669); color: #fff;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span>Launch Web App Console</span>
+                </a>
                 <a href="#downloads" id="hero-download-btn" class="btn-primary">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                     <span>Download Windows Standalone</span>
                 </a>
                 <a href="#smart-tv" class="btn-secondary">
                     <span>📺 Smart TV & Mobile PWA</span>
-                </a>
-                <a href="#sync-tool" class="btn-secondary">
-                    <span>⚡ Sync Calibrator</span>
                 </a>
             </div>
 
@@ -1358,6 +1360,11 @@ python main.py</div>
 
     <!-- Interactive Scripts: PWA, Web Audio Metronome & Canvas Visualizer -->
     <script>
+        // Automatically open the full BassBridge Application when launched from Phone Home Screen
+        if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true || window.location.search.includes('mode=app')) {
+            window.location.replace('./app.html');
+        }
+
         // -------------------------------------------------------------
         // Service Worker Registration for PWA
         // -------------------------------------------------------------

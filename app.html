@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BassBridge App — Pro Audio Console</title>
+    
+    <!-- PWA Meta -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#00F0FF">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="BassBridge">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-base: #07090E;
+            --bg-surface: #0E131F;
+            --bg-card: #141B2D;
+            --bg-card-hover: #1A233A;
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(0, 240, 255, 0.35);
+            --text-main: #F3F4F6;
+            --text-muted: #9CA3AF;
+            --cyan: #00F0FF;
+            --cyan-glow: rgba(0, 240, 255, 0.25);
+            --purple: #A855F7;
+            --green: #10B981;
+            --font-sans: 'Plus Jakarta Sans', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.4;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+            padding-bottom: 24px;
+        }
+
+        /* Top App Bar */
+        .app-bar {
+            background: rgba(14, 19, 31, 0.95);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+        }
+
+        .app-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            font-size: 1.15rem;
+            color: #fff;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--green);
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 16px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        /* Card */
+        .card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 0.85rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--cyan);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Canvas Spectrum */
+        #spectrum-canvas {
+            width: 100%;
+            height: 140px;
+            border-radius: 10px;
+            background: #05070B;
+            display: block;
+            border: 1px solid var(--border);
+        }
+
+        /* Knobs & Sliders */
+        .slider-group {
+            margin-bottom: 14px;
+        }
+
+        .slider-label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 0.88rem;
+            font-weight: 600;
+        }
+
+        .val-badge {
+            font-family: var(--font-mono);
+            color: var(--cyan);
+            font-weight: 700;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #1C2438;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--cyan);
+            cursor: pointer;
+            box-shadow: 0 0 12px var(--cyan);
+        }
+
+        /* Nudge & Preset Buttons */
+        .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+
+        .btn-pill {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border);
+            color: #E2E8F0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex: 1;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .btn-pill:hover, .btn-pill:focus, .btn-pill.active {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--cyan);
+            color: #fff;
+            outline: none;
+        }
+
+        .btn-purple {
+            background: rgba(168, 85, 247, 0.12);
+            border-color: rgba(168, 85, 247, 0.3);
+        }
+
+        .btn-purple:hover, .btn-purple:focus {
+            background: rgba(168, 85, 247, 0.25);
+            border-color: var(--purple);
+            color: #fff;
+        }
+
+        /* Checkbox Toggles */
+        .toggle-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .toggle-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .toggle-btn.checked {
+            background: rgba(0, 240, 255, 0.12);
+            border-color: var(--cyan);
+            color: #fff;
+        }
+
+        .toggle-icon {
+            font-size: 1.1rem;
+        }
+
+        /* Master Play Button */
+        .btn-play-engine {
+            width: 100%;
+            padding: 16px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, var(--cyan), #0099FF);
+            color: #000;
+            font-weight: 800;
+            font-size: 1.05rem;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 0 25px var(--cyan-glow);
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-play-engine:hover, .btn-play-engine:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 0 35px rgba(0, 240, 255, 0.45);
+            outline: none;
+        }
+
+        /* Built-in Audio Player Bar */
+        .test-audio-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .btn-audio-test {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-audio-test:hover, .btn-audio-test:focus {
+            background: rgba(0, 240, 255, 0.2);
+            border-color: var(--cyan);
+        }
+
+        /* Back to Website link */
+        .web-link-row {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 0.82rem;
+        }
+
+        .web-link-row a {
+            color: var(--text-muted);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .web-link-row a:hover {
+            color: var(--cyan);
+        }
+
+        @media (max-width: 600px) {
+            .toggle-row { grid-template-columns: 1fr; }
+            .container { padding: 12px; }
+            .card { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- App Top Bar -->
+    <header class="app-bar">
+        <div class="app-brand">
+            <img src="icon.svg" alt="BassBridge" style="width: 28px; height: 28px;">
+            <span>BassBridge</span>
+        </div>
+        <div id="engine-status" class="status-pill">
+            <span class="status-dot"></span>
+            <span id="status-text">Audio DSP Ready</span>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Master Engine Toggle -->
+        <button id="btn-toggle-engine" class="btn-play-engine" onclick="toggleAudioEngine()">
+            <span id="play-icon">▶</span>
+            <span id="play-text">START BASSBRIDGE AUDIO</span>
+        </button>
+
+        <!-- Live Spectrum Analyzer Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>⚡</span>
+                    <span>Real-Time Spectrum & Crossover</span>
+                </div>
+                <div id="crossover-display" class="val-badge" style="font-size: 0.95rem;">85 Hz</div>
+            </div>
+
+            <canvas id="spectrum-canvas" width="700" height="140"></canvas>
+
+            <div style="margin-top: 14px;">
+                <div class="slider-label-row">
+                    <span>Crossover Cutoff Frequency:</span>
+                    <span id="crossover-val" class="val-badge">85 Hz</span>
+                </div>
+                <input type="range" id="crossover-slider" min="40" max="250" value="85" oninput="updateCrossover(this.value)">
+                
+                <div class="btn-row">
+                    <button class="btn-pill" onclick="applyPreset('Movies')">Movies (85Hz)</button>
+                    <button class="btn-pill" onclick="applyPreset('Music')">Music (90Hz)</button>
+                    <button class="btn-pill" onclick="applyPreset('Gaming')">Gaming (85Hz)</button>
+                    <button class="btn-pill" onclick="applyPreset('Deep')">Deep Bass (70Hz)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Volume & Punch Control Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>🎚️</span>
+                    <span>Volume & Output Staging</span>
+                </div>
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-label-row">
+                    <span>Laptop / TV Speaker Volume:</span>
+                    <span id="main-vol-display" class="val-badge">100%</span>
+                </div>
+                <input type="range" id="main-vol-slider" min="0" max="150" value="100" oninput="updateMainVol(this.value)">
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-label-row">
+                    <span>Bluetooth Sub-Bass Volume:</span>
+                    <span id="bass-vol-display" class="val-badge">100%</span>
+                </div>
+                <input type="range" id="bass-vol-slider" min="0" max="150" value="100" oninput="updateBassVol(this.value)">
+            </div>
+
+            <!-- DSP Audio Feature Toggles -->
+            <div class="toggle-row">
+                <div id="toggle-dolby" class="toggle-btn checked" onclick="toggleFeature('dolby')">
+                    <span class="toggle-icon">✨</span>
+                    <div>
+                        <div>Dolby Dialogue Clarity</div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">+2.0 dB @ 2.4 kHz Speech Boost</div>
+                    </div>
+                </div>
+
+                <div id="toggle-autobass" class="toggle-btn checked" onclick="toggleFeature('autobass')">
+                    <span class="toggle-icon">🎚️</span>
+                    <div>
+                        <div>Auto-EQ & De-Boom</div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">Compresses Unnecessary Bass</div>
+                    </div>
+                </div>
+
+                <div id="toggle-subsonic" class="toggle-btn checked" onclick="toggleFeature('subsonic')">
+                    <span class="toggle-icon">🛡️</span>
+                    <div>
+                        <div>Sub-Rumble Cut (50Hz)</div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">Eliminates Cone Flapping</div>
+                    </div>
+                </div>
+
+                <div id="toggle-split" class="toggle-btn checked" onclick="toggleFeature('split')">
+                    <span class="toggle-icon">✂️</span>
+                    <div>
+                        <div>Bass Split Mode</div>
+                        <div style="font-size: 0.72rem; color: var(--text-muted);">High-Pass on Main Speakers</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Latency Sync Timing Card -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>⏱️</span>
+                    <span>Bluetooth Latency Sync</span>
+                </div>
+                <div id="delay-display" class="val-badge" style="font-size: 1.05rem;">0 ms</div>
+            </div>
+
+            <div class="slider-group">
+                <div class="slider-label-row">
+                    <span>Timing Compensation Offset:</span>
+                    <span id="delay-sub-display" class="val-badge">0 ms</span>
+                </div>
+                <input type="range" id="delay-slider" min="0" max="500" value="0" oninput="updateDelay(this.value)">
+            </div>
+
+            <!-- Micro-Timing Nudge -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Micro-Timing Nudge (1 ms steps):</span>
+            </div>
+            <div class="btn-row" style="margin-bottom: 12px;">
+                <button class="btn-pill btn-purple" onclick="nudgeDelay(-10)">-10ms</button>
+                <button class="btn-pill btn-purple" onclick="nudgeDelay(-1)">-1ms</button>
+                <button class="btn-pill btn-purple" onclick="nudgeDelay(1)">+1ms</button>
+                <button class="btn-pill btn-purple" onclick="nudgeDelay(10)">+10ms</button>
+            </div>
+
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px;">Device Latency Presets:</div>
+            <div class="btn-row">
+                <button class="btn-pill active" onclick="setDelayPreset('Live', 0)">0ms (Live)</button>
+                <button class="btn-pill" onclick="setDelayPreset('boAt', 140)">boAt (140ms)</button>
+                <button class="btn-pill" onclick="setDelayPreset('Echo', 160)">Echo Dot (160ms)</button>
+                <button class="btn-pill" onclick="setDelayPreset('TV', 180)">Smart TV (180ms)</button>
+            </div>
+        </div>
+
+        <!-- Built-in Audio Test Generator -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <span>🎵</span>
+                    <span>Built-In Audio Generator & Metronome</span>
+                </div>
+            </div>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 10px;">
+                Test real-time crossover separation and sync pulses right on your phone or TV:
+            </p>
+            <div class="btn-row">
+                <button id="btn-pulse" class="btn-pill" onclick="toggleSyncPulse()">▶ Sync Pulse Click</button>
+                <button id="btn-bass-tone" class="btn-pill" onclick="toggleBassTone()">▶ 65 Hz Bass Kick</button>
+                <button id="btn-vocal-tone" class="btn-pill" onclick="toggleVocalSpeech()">▶ Dialogue Test</button>
+            </div>
+        </div>
+
+        <div class="web-link-row">
+            <a href="index.html">← Back to BassBridge Website & Guide</a>
+        </div>
+    </main>
+
+    <!-- Web Audio API Script Engine -->
+    <script>
+        // -------------------------------------------------------------
+        // Service Worker
+        // -------------------------------------------------------------
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(() => {});
+        }
+
+        // -------------------------------------------------------------
+        // Web Audio Pipeline
+        // -------------------------------------------------------------
+        let audioCtx = null;
+        let isEngineRunning = false;
+        let masterGain = null;
+        let lpFilter1 = null;
+        let lpFilter2 = null;
+        let hpFilter1 = null;
+        let hpFilter2 = null;
+        let infraFilter = null;
+        let dolbyFilter = null;
+        let delayNode = null;
+        let analyser = null;
+
+        let activeOsc = null;
+        let pulseTimer = null;
+        let isPulsePlaying = false;
+
+        let currentCrossover = 85;
+        let currentDelayMs = 0;
+        let mainVol = 1.0;
+        let bassVol = 1.0;
+
+        let dolbyEnabled = true;
+        let autoBassEnabled = true;
+        let subsonicEnabled = true;
+        let splitEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            if (!masterGain) {
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 1.0;
+
+                // 4th order Linkwitz-Riley lowpass (two 2nd order Butterworth cascaded)
+                lpFilter1 = audioCtx.createBiquadFilter();
+                lpFilter1.type = 'lowpass';
+                lpFilter1.frequency.value = currentCrossover;
+                lpFilter1.Q.value = 0.7071;
+
+                lpFilter2 = audioCtx.createBiquadFilter();
+                lpFilter2.type = 'lowpass';
+                lpFilter2.frequency.value = currentCrossover;
+                lpFilter2.Q.value = 0.7071;
+
+                // Subsonic 50 Hz rumble cut
+                infraFilter = audioCtx.createBiquadFilter();
+                infraFilter.type = 'highpass';
+                infraFilter.frequency.value = 50;
+                infraFilter.Q.value = 0.7071;
+
+                // Dolby vocal presence EQ at 2.4 kHz (+2 dB)
+                dolbyFilter = audioCtx.createBiquadFilter();
+                dolbyFilter.type = 'peaking';
+                dolbyFilter.frequency.value = 2400;
+                dolbyFilter.gain.value = 2.0;
+                dolbyFilter.Q.value = 1.2;
+
+                // Delay Line
+                delayNode = audioCtx.createDelay(1.0);
+                delayNode.delayTime.value = currentDelayMs / 1000.0;
+
+                // Analyser
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 256;
+
+                // Routing: Master -> Filters -> Analyser -> Destination
+                masterGain.connect(lpFilter1);
+                lpFilter1.connect(lpFilter2);
+                lpFilter2.connect(infraFilter);
+                infraFilter.connect(delayNode);
+                delayNode.connect(analyser);
+                analyser.connect(audioCtx.destination);
+            }
+        }
+
+        function toggleAudioEngine() {
+            initAudio();
+            isEngineRunning = !isEngineRunning;
+            const btn = document.getElementById('btn-toggle-engine');
+            const playIcon = document.getElementById('play-icon');
+            const playText = document.getElementById('play-text');
+            const statusText = document.getElementById('status-text');
+
+            if (isEngineRunning) {
+                btn.style.background = 'linear-gradient(135deg, #10B981, #059669)';
+                playIcon.textContent = '⏹';
+                playText.textContent = 'BASSBRIDGE RUNNING — ACTIVE';
+                statusText.textContent = 'Engine Running';
+                // Start lively groove demo
+                playGrooveDemo();
+            } else {
+                btn.style.background = 'linear-gradient(135deg, var(--cyan), #0099FF)';
+                playIcon.textContent = '▶';
+                playText.textContent = 'START BASSBRIDGE AUDIO';
+                statusText.textContent = 'Standby';
+                stopDemo();
+            }
+        }
+
+        // Demo groove synthesizer
+        let demoInterval = null;
+        function playGrooveDemo() {
+            stopDemo();
+            initAudio();
+            let step = 0;
+            const kickFreqs = [65, 0, 75, 0, 65, 0, 80, 55];
+
+            demoInterval = setInterval(() => {
+                if (!isEngineRunning) return;
+                const freq = kickFreqs[step % kickFreqs.length];
+                if (freq > 0) {
+                    triggerSyntheticKick(freq);
+                }
+                step++;
+            }, 250); // 120 BPM 8th notes
+        }
+
+        function stopDemo() {
+            if (demoInterval) {
+                clearInterval(demoInterval);
+                demoInterval = null;
+            }
+            if (pulseTimer) {
+                clearInterval(pulseTimer);
+                pulseTimer = null;
+                isPulsePlaying = false;
+                document.getElementById('btn-pulse').textContent = '▶ Sync Pulse Click';
+            }
+        }
+
+        function triggerSyntheticKick(f0) {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(f0 * 1.5, now);
+            osc.frequency.exponentialRampToValueAtTime(f0, now + 0.08);
+
+            g.gain.setValueAtTime(0.7 * bassVol, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+            osc.connect(g);
+            g.connect(masterGain);
+
+            osc.start(now);
+            osc.stop(now + 0.22);
+        }
+
+        function toggleSyncPulse() {
+            initAudio();
+            const btn = document.getElementById('btn-pulse');
+            if (isPulsePlaying) {
+                clearInterval(pulseTimer);
+                pulseTimer = null;
+                isPulsePlaying = false;
+                btn.textContent = '▶ Sync Pulse Click';
+            } else {
+                isPulsePlaying = true;
+                btn.textContent = '⏹ Stop Pulse';
+                triggerSyncClick();
+                pulseTimer = setInterval(triggerSyncClick, 1000);
+            }
+        }
+
+        function triggerSyncClick() {
+            initAudio();
+            const now = audioCtx.currentTime;
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1000, now);
+            osc.frequency.exponentialRampToValueAtTime(80, now + 0.03);
+
+            g.gain.setValueAtTime(0.8, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+            osc.connect(g);
+            g.connect(masterGain);
+
+            osc.start(now);
+            osc.stop(now + 0.03);
+        }
+
+        function toggleBassTone() {
+            triggerSyntheticKick(65);
+        }
+
+        function toggleVocalSpeech() {
+            initAudio();
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utter = new SpeechSynthesisUtterance("Testing Dolby dialogue clarity on BassBridge.");
+                utter.rate = 1.0;
+                window.speechSynthesis.speak(utter);
+            } else {
+                triggerSyncClick();
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Parameter Updates
+        // -------------------------------------------------------------
+        function updateCrossover(val) {
+            currentCrossover = parseInt(val);
+            document.getElementById('crossover-val').textContent = currentCrossover + ' Hz';
+            document.getElementById('crossover-display').textContent = currentCrossover + ' Hz';
+            if (lpFilter1 && lpFilter2) {
+                lpFilter1.frequency.value = currentCrossover;
+                lpFilter2.frequency.value = currentCrossover;
+            }
+        }
+
+        function updateDelay(val) {
+            currentDelayMs = parseInt(val);
+            document.getElementById('delay-display').textContent = currentDelayMs + ' ms';
+            document.getElementById('delay-sub-display').textContent = currentDelayMs + ' ms';
+            document.getElementById('delay-slider').value = currentDelayMs;
+            if (delayNode) {
+                delayNode.delayTime.value = currentDelayMs / 1000.0;
+            }
+        }
+
+        function nudgeDelay(delta) {
+            updateDelay(Math.max(0, Math.min(500, currentDelayMs + delta)));
+        }
+
+        function setDelayPreset(name, ms) {
+            updateDelay(ms);
+        }
+
+        function updateMainVol(val) {
+            mainVol = parseInt(val) / 100.0;
+            document.getElementById('main-vol-display').textContent = val + '%';
+        }
+
+        function updateBassVol(val) {
+            bassVol = parseInt(val) / 100.0;
+            document.getElementById('bass-vol-display').textContent = val + '%';
+            if (masterGain) {
+                masterGain.gain.value = bassVol;
+            }
+        }
+
+        function applyPreset(name) {
+            if (name === 'Movies') {
+                updateCrossover(85);
+                updateBassVol(110);
+            } else if (name === 'Music') {
+                updateCrossover(90);
+                updateBassVol(100);
+            } else if (name === 'Gaming') {
+                updateCrossover(85);
+                updateBassVol(95);
+            } else if (name === 'Deep') {
+                updateCrossover(70);
+                updateBassVol(120);
+            }
+        }
+
+        function toggleFeature(id) {
+            initAudio();
+            if (id === 'dolby') {
+                dolbyEnabled = !dolbyEnabled;
+                document.getElementById('toggle-dolby').classList.toggle('checked', dolbyEnabled);
+                if (dolbyFilter) dolbyFilter.gain.value = dolbyEnabled ? 2.0 : 0.0;
+            } else if (id === 'autobass') {
+                autoBassEnabled = !autoBassEnabled;
+                document.getElementById('toggle-autobass').classList.toggle('checked', autoBassEnabled);
+            } else if (id === 'subsonic') {
+                subsonicEnabled = !subsonicEnabled;
+                document.getElementById('toggle-subsonic').classList.toggle('checked', subsonicEnabled);
+                if (infraFilter) infraFilter.frequency.value = subsonicEnabled ? 50 : 10;
+            } else if (id === 'split') {
+                splitEnabled = !splitEnabled;
+                document.getElementById('toggle-split').classList.toggle('checked', splitEnabled);
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Canvas Spectrum Rendering
+        // -------------------------------------------------------------
+        const canvas = document.getElementById('spectrum-canvas');
+        const ctx = canvas.getContext('2d');
+        let simTime = 0;
+
+        function drawSpectrum() {
+            simTime += 0.04;
+            const w = canvas.width;
+            const h = canvas.height;
+            ctx.clearRect(0, 0, w, h);
+
+            // Grid lines
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 1;
+            for (let y = 20; y < h; y += 30) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(w, y);
+                ctx.stroke();
+            }
+
+            // Cutoff Line
+            const cutoffX = (Math.log10(currentCrossover) - Math.log10(20)) / (Math.log10(20000) - Math.log10(20)) * w;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.moveTo(cutoffX, 0);
+            ctx.lineTo(cutoffX, h);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Frequency bars
+            const numBars = 48;
+            const barW = w / numBars;
+
+            let audioData = null;
+            if (analyser && isEngineRunning) {
+                audioData = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(audioData);
+            }
+
+            for (let i = 0; i < numBars; i++) {
+                const fraction = i / numBars;
+                const freq = 20 * Math.pow(20000 / 20, fraction);
+                const x = i * barW;
+
+                let energy = 0;
+                if (audioData) {
+                    energy = audioData[Math.min(i * 2, audioData.length - 1)] / 255.0;
+                } else {
+                    let base = Math.exp(-Math.pow((Math.log10(freq) - Math.log10(currentCrossover)), 2) / 0.6) * 0.7;
+                    let dyn = isEngineRunning ? Math.sin(simTime * 4 + i * 0.5) * 0.2 : 0.05;
+                    energy = Math.max(0.04, Math.min(0.9, base + dyn));
+                }
+
+                const barH = energy * (h - 20);
+
+                if (freq <= currentCrossover) {
+                    ctx.fillStyle = 'rgba(168, 85, 247, 0.85)';
+                } else {
+                    ctx.fillStyle = 'rgba(0, 240, 255, 0.85)';
+                }
+
+                ctx.fillRect(x + 1, h - barH - 4, barW - 2, barH);
+            }
+
+            requestAnimationFrame(drawSpectrum);
+        }
+
+        function resizeCanvas() {
+            if (canvas && canvas.parentElement) {
+                canvas.width = canvas.parentElement.clientWidth - 40;
+                canvas.height = 140;
+            }
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        drawSpectrum();
+
+        // Remote / Keyboard navigation for Smart TV
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft') {
+                nudgeDelay(-1);
+            } else if (e.key === 'ArrowRight') {
+                nudgeDelay(1);
+            } else if (e.key === 'ArrowUp') {
+                updateCrossover(Math.min(250, currentCrossover + 5));
+            } else if (e.key === 'ArrowDown') {
+                updateCrossover(Math.max(40, currentCrossover - 5));
+            } else if (e.key === ' ' || e.key === 'Enter') {
+                if (document.activeElement === document.body) {
+                    toggleAudioEngine();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

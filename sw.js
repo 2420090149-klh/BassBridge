@@ -1,7 +1,8 @@
-const CACHE_NAME = 'bassbridge-v2';
+const CACHE_NAME = 'bassbridge-v3';
 const STATIC_ASSETS = [
   './',
   './index.html',
+  './app.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
@@ -38,7 +39,6 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Return cached and update in background
         fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             caches.open(CACHE_NAME).then((cache) => {
@@ -50,7 +50,7 @@ self.addEventListener('fetch', (event) => {
       }
       return fetch(event.request).catch(() => {
         if (event.request.headers.get('accept').includes('text/html')) {
-          return caches.match('./index.html');
+          return caches.match('./app.html') || caches.match('./index.html');
         }
       });
     })

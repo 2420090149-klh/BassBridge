@@ -2,7 +2,7 @@
   "name": "BassBridge — Dolby Atmos Bass Companion",
   "short_name": "BassBridge",
   "description": "Turn any Bluetooth speaker into a wireless Dolby Atmos subwoofer with zero dialogue bleed and real-time sync calibration.",
-  "start_url": "./index.html",
+  "start_url": "./app.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
