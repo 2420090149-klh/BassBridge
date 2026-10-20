@@ -69,7 +69,7 @@ class AudioEngine:
         self._lock = threading.Lock()
 
         # Engine settings
-        self.buffer_size: int = 1024
+        self.buffer_size: int = 512
         self.capture_sample_rate: int = 48000
         self.main_sample_rate: int = 48000
         self.bass_sample_rate: int = 48000
@@ -217,9 +217,9 @@ class AudioEngine:
                 self.main_buffer_size = max(64, int(round(self.buffer_size * (self.main_sample_rate / self.capture_sample_rate))))
                 self.bass_buffer_size = max(64, int(round(self.buffer_size * (self.bass_sample_rate / self.capture_sample_rate))))
 
-                # Pre-roll 2 periods of silence into buffers to eliminate initial starvation
-                self.main_buffer.prefill_silence(self.main_buffer_size * 2)
-                self.bass_buffer.prefill_silence(self.bass_buffer_size * 2)
+                # Pre-roll 1 period of silence for ultra-low latency and lively transient timing
+                self.main_buffer.prefill_silence(self.main_buffer_size)
+                self.bass_buffer.prefill_silence(self.bass_buffer_size)
 
                 # Open audio streams
                 self._in_stream = self._pa.open(

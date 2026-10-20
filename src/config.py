@@ -78,7 +78,7 @@ class AppConfig:
     bass_gain_db: float = 0.0      # Range: -24.0 to +12.0 dB
     main_volume: float = 1.0       # Range: 0.0 to 1.5
     bass_volume: float = 1.0       # Range: 0.0 to 1.5
-    bass_delay_ms: float = 120.0   # Range: 0.0 to 500.0 ms
+    bass_delay_ms: float = 0.0     # Range: 0.0 to 500.0 ms (Default 0ms for instant lively timing)
     bass_muted: bool = False
     bass_split_enabled: bool = True
     bass_clarity_enabled: bool = True    # Tight punch & vocal mud reduction
@@ -91,7 +91,7 @@ class AppConfig:
 
 
     # Performance and buffer
-    buffer_size: int = 1024        # Frames per buffer: 512, 1024, 2048
+    buffer_size: int = 512         # Frames per buffer: 256, 512, 1024 (Default 512 for ~10ms lively response)
     target_sample_rate: int = 48000
 
     # Active preset name

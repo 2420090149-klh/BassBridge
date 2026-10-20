@@ -1140,13 +1140,22 @@ Or sideload via USB / ADB file transfer</div>
 
                         <input type="range" id="sync-slider" class="crossover-slider" style="width: 100%; height: 8px; margin-bottom: 16px;" min="0" max="500" value="140" oninput="updateSyncDelay(this.value)">
 
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-size: 0.85rem; color: var(--text-muted);">Micro-Timing Nudge (1ms Steps):</span>
+                            <div style="display: flex; gap: 4px;">
+                                <button class="btn-sync-preset" style="padding: 4px 8px; font-size: 0.75rem;" onclick="nudgeSyncDelay(-10)">-10ms</button>
+                                <button class="btn-sync-preset" style="padding: 4px 8px; font-size: 0.75rem;" onclick="nudgeSyncDelay(-1)">-1ms</button>
+                                <button class="btn-sync-preset" style="padding: 4px 8px; font-size: 0.75rem;" onclick="nudgeSyncDelay(1)">+1ms</button>
+                                <button class="btn-sync-preset" style="padding: 4px 8px; font-size: 0.75rem;" onclick="nudgeSyncDelay(10)">+10ms</button>
+                            </div>
+                        </div>
                         <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">Quick Device Presets:</div>
                         <div class="sync-presets">
-                            <button class="btn-sync-preset" onclick="setSyncPreset('Echo Dot', 160)">Amazon Echo Dot (160ms)</button>
+                            <button class="btn-sync-preset" onclick="setSyncPreset('Live 0ms', 0)">Live (0ms)</button>
                             <button class="btn-sync-preset active" onclick="setSyncPreset('boAt Stone', 140)">boAt Stone / Rockerz (140ms)</button>
+                            <button class="btn-sync-preset" onclick="setSyncPreset('Echo Dot', 160)">Amazon Echo Dot (160ms)</button>
                             <button class="btn-sync-preset" onclick="setSyncPreset('Smart TV', 180)">Smart TV Internal + BT (180ms)</button>
-                            <button class="btn-sync-preset" onclick="setSyncPreset('Gaming', 45)">Gaming Low-Latency (45ms)</button>
-                            <button class="btn-sync-preset" onclick="setSyncPreset('Wired', 15)">Wired Aux / HDMI ARC (15ms)</button>
+                            <button class="btn-sync-preset" onclick="setSyncPreset('Gaming', 45)">Gaming (45ms)</button>
                         </div>
 
                         <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 16px; line-height: 1.5;">
@@ -1473,6 +1482,15 @@ python main.py</div>
             currentSyncDelayMs = parseInt(val);
             const disp = document.getElementById('sync-delay-display');
             if (disp) disp.textContent = currentSyncDelayMs + ' ms';
+        }
+
+        function nudgeSyncDelay(delta) {
+            const slider = document.getElementById('sync-slider');
+            if (slider) {
+                let next = Math.max(0, Math.min(500, parseInt(slider.value) + delta));
+                slider.value = next;
+                updateSyncDelay(next);
+            }
         }
 
         function setSyncPreset(name, ms) {

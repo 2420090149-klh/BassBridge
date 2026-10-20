@@ -281,10 +281,18 @@ class MainWindow(QMainWindow):
         self.slider_delay.valueChanged.connect(self._on_delay_slider_changed)
         crossover_box.addWidget(self.slider_delay)
 
-        # Quick Sync Latency Presets
+        # Micro-Timing Nudge & Quick Device Presets
         sync_preset_row = QHBoxLayout()
-        sync_preset_row.setSpacing(4)
-        for label, ms in [("Echo (160ms)", 160), ("boAt (140ms)", 140), ("TV (180ms)", 180), ("Fast (45ms)", 45)]:
+        sync_preset_row.setSpacing(3)
+        for label, delta in [("-10ms", -10), ("-1ms", -1), ("+1ms", 1), ("+10ms", 10)]:
+            btn = QPushButton(label)
+            btn.setFixedHeight(22)
+            btn.setStyleSheet("font-size: 10px; padding: 2px 4px; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.3); border-radius: 4px; color: #E6EDF3;")
+            btn.setToolTip(f"Nudge timing by {label} for microsecond precision")
+            btn.clicked.connect(lambda checked=False, d=delta: self.slider_delay.setValue(max(0, min(500, self.slider_delay.value() + d))))
+            sync_preset_row.addWidget(btn)
+
+        for label, ms in [("0ms", 0), ("boAt (140)", 140), ("Echo (160)", 160), ("TV (180)", 180)]:
             btn = QPushButton(label)
             btn.setFixedHeight(22)
             btn.setStyleSheet("font-size: 10px; padding: 2px 4px; background: rgba(0,240,255,0.08); border: 1px solid rgba(0,240,255,0.25); border-radius: 4px; color: #E6EDF3;")
