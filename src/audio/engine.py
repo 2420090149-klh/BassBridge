@@ -435,6 +435,15 @@ class AudioEngine:
                 break
         logger.info("Bass output worker terminated.")
 
+    def inject_sync_test_signal(self, main_signal: np.ndarray, bass_signal: np.ndarray) -> None:
+        """Inject acoustic test alignment signals directly into the playback buffers."""
+        if self.state != EngineState.RUNNING:
+            return
+        main_res = self.main_resampler.resample(main_signal)
+        bass_res = self.bass_resampler.resample(bass_signal)
+        self.main_buffer.write(main_res)
+        self.bass_buffer.write(bass_res)
+
     def get_metrics(self) -> dict:
         """Return real-time diagnostic information for UI meters and monitors."""
         main_underrun, main_overrun, main_fill = self.main_buffer.get_health_stats()
@@ -458,5 +467,7 @@ class AudioEngine:
             "main_buffer_fill": main_fill,
             "bass_buffer_fill": bass_fill,
             "is_split_mode": not getattr(self, "capture_is_main_output", False),
+            "is_true_sync_active": not getattr(self, "capture_is_main_output", False),
+            "delay_ms": self.delay_line.delay_ms,
         }
 

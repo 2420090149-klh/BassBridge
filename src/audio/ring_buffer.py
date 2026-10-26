@@ -213,15 +213,28 @@ class AudioDelayLine:
 
         with self._lock:
             delay_f = self._delay_frames
+            cap = self.max_delay_frames
             out = np.empty_like(input_block)
 
-            # Circular write & read with offset
-            for i in range(frames):
-                self._buffer[self._write_idx] = input_block[i]
-                read_idx = (self._write_idx - delay_f) % self.max_delay_frames
-                out[i] = self._buffer[read_idx]
-                self._write_idx = (self._write_idx + 1) % self.max_delay_frames
+            # Vectorized circular write
+            w = self._write_idx
+            if w + frames <= cap:
+                self._buffer[w:w + frames] = input_block
+            else:
+                p1 = cap - w
+                self._buffer[w:] = input_block[:p1]
+                self._buffer[:frames - p1] = input_block[p1:]
 
+            # Vectorized circular read with delay_f offset
+            r = (w - delay_f) % cap
+            if r + frames <= cap:
+                out[:] = self._buffer[r:r + frames]
+            else:
+                p1 = cap - r
+                out[:p1] = self._buffer[r:]
+                out[p1:] = self._buffer[:frames - p1]
+
+            self._write_idx = (w + frames) % cap
             return out
 
     def reset(self) -> None:

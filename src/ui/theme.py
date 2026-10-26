@@ -186,6 +186,64 @@ QCheckBox::indicator:checked {{
     border-color: {COLOR_ACCENT_CYAN};
 }}
 
+QPushButton#TrueSyncButton {{
+    background-color: rgba(0, 229, 255, 0.15);
+    border: 1px solid #00e5ff;
+    color: #00e5ff;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 6px 12px;
+}}
+
+QPushButton#TrueSyncButton:hover {{
+    background-color: #00e5ff;
+    color: #000000;
+}}
+
+QPushButton#PulseButton {{
+    background-color: rgba(168, 85, 247, 0.15);
+    border: 1px solid #a855f7;
+    color: #e0b0ff;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 6px 12px;
+}}
+
+QPushButton#PulseButton:hover {{
+    background-color: #a855f7;
+    color: #ffffff;
+}}
+
+QPushButton#PulseActiveButton {{
+    background-color: #ff6d00;
+    border: 1px solid #ffab40;
+    color: #ffffff;
+    font-weight: 800;
+    border-radius: 6px;
+    padding: 6px 12px;
+}}
+
+QPushButton#CalibrateButton {{
+    background-color: rgba(0, 230, 118, 0.15);
+    border: 1px solid #00e676;
+    color: #00e676;
+    font-weight: 700;
+    border-radius: 6px;
+    padding: 6px 12px;
+}}
+
+QPushButton#CalibrateButton:hover {{
+    background-color: #00e676;
+    color: #000000;
+}}
+
+QFrame#SyncBannerCard {{
+    background-color: rgba(14, 22, 35, 0.9);
+    border: 1px solid rgba(0, 229, 255, 0.25);
+    border-radius: 8px;
+    padding: 10px 14px;
+}}
+
 QStatusBar {{
     background-color: {COLOR_BG_SURFACE};
     color: {COLOR_TEXT_SECONDARY};

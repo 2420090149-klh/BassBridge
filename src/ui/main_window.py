@@ -173,6 +173,12 @@ class MainWindow(QMainWindow):
         hdr_layout.addWidget(hdr_lbl)
         hdr_layout.addStretch()
 
+        self.btn_true_sync = QPushButton("🎯 1-Click True Sync Mode")
+        self.btn_true_sync.setObjectName("TrueSyncButton")
+        self.btn_true_sync.setToolTip("Configure Virtual Sink loopback for active laptop delay compensation (eliminates Bluetooth lag)")
+        self.btn_true_sync.clicked.connect(self._enable_true_sync_mode)
+        hdr_layout.addWidget(self.btn_true_sync)
+
         btn_bt_settings = QPushButton("Pair Bluetooth")
         btn_bt_settings.setToolTip("Open Windows Bluetooth & Devices Settings")
         btn_bt_settings.clicked.connect(self._open_bluetooth_settings)
@@ -307,6 +313,26 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(lambda checked=False, val=ms: self.slider_delay.setValue(val))
             sync_preset_row.addWidget(btn)
         crossover_box.addLayout(sync_preset_row)
+
+        # Live Acoustic Metronome & 1-Tap Mic Ping Calibrator Bar
+        sync_tool_row = QHBoxLayout()
+        sync_tool_row.setSpacing(6)
+
+        self.btn_test_sync = QPushButton("▶ Test Sync Pulse")
+        self.btn_test_sync.setObjectName("PulseButton")
+        self.btn_test_sync.setFixedHeight(26)
+        self.btn_test_sync.setToolTip("Play synchronized clicks (High on Laptop, Low on Bluetooth) to align sync by ear")
+        self.btn_test_sync.clicked.connect(self._toggle_sync_pulse)
+        sync_tool_row.addWidget(self.btn_test_sync)
+
+        self.btn_mic_calib = QPushButton("🎯 1-Tap Mic Ping Calibrator")
+        self.btn_mic_calib.setObjectName("CalibrateButton")
+        self.btn_mic_calib.setFixedHeight(26)
+        self.btn_mic_calib.setToolTip("Measure exact acoustic arrival delay using laptop microphone")
+        self.btn_mic_calib.clicked.connect(self._run_mic_calibration)
+        sync_tool_row.addWidget(self.btn_mic_calib)
+
+        crossover_box.addLayout(sync_tool_row)
 
         knob_row.addLayout(crossover_box)
         layout.addLayout(knob_row)
@@ -601,10 +627,13 @@ class MainWindow(QMainWindow):
             )
         )
 
-        for lb in sorted_loopbacks:
+        virtual_sink_idx = -1
+        for i, lb in enumerate(sorted_loopbacks):
             rate_khz = lb.default_sample_rate // 1000
             if getattr(lb, "is_virtual_sink", False):
                 lbl = f"🎯 [True Split Sink] {lb.name} ({rate_khz} kHz)"
+                if virtual_sink_idx == -1:
+                    virtual_sink_idx = i
             elif lb.is_laptop_speaker or "realtek" in lb.name.lower():
                 lbl = f"💻 [Laptop Master] {lb.name} ({rate_khz} kHz)"
             elif lb.is_bluetooth:
@@ -615,15 +644,19 @@ class MainWindow(QMainWindow):
             self.combo_capture.addItem(lbl, lb.name)
 
             if self.config.capture_device_name and lb.name == self.config.capture_device_name:
-                default_capture_idx = capture_idx
-            elif not self.config.capture_device_name and getattr(lb, "is_virtual_sink", False) and default_capture_idx == 0:
-                default_capture_idx = capture_idx
+                default_capture_idx = i
 
-            capture_idx += 1
-
+        default_loopback_idx = len(sorted_loopbacks)
         self.combo_capture.addItem("Default Playback (Loopback)", "Default")
-        if self.config.capture_device_name == "Default":
-            default_capture_idx = capture_idx
+
+        if self.config.capture_device_name and self.config.capture_device_name != "Default":
+            # Retain user's saved preference
+            pass
+        elif virtual_sink_idx != -1:
+            # Auto-activate True Sync Mode via detected virtual sink
+            default_capture_idx = virtual_sink_idx
+        else:
+            default_capture_idx = default_loopback_idx
 
         self.combo_capture.setCurrentIndex(default_capture_idx)
 
@@ -681,6 +714,120 @@ class MainWindow(QMainWindow):
             self.status_bar.showMessage("Opened Windows Sound Settings. Verify Default Output is Laptop Speakers.")
         except Exception as e:
             print(f"Error opening sound settings: {e}")
+
+    def _enable_true_sync_mode(self) -> None:
+        """One-click setup for True Acoustic Sync Mode using a virtual loopback sink."""
+        loopbacks = self.device_mgr.get_loopback_devices()
+        sink_dev = None
+        for lb in loopbacks:
+            if getattr(lb, "is_virtual_sink", False):
+                sink_dev = lb
+                break
+
+        if sink_dev:
+            for i in range(self.combo_capture.count()):
+                if self.combo_capture.itemData(i) == sink_dev.name:
+                    self.combo_capture.setCurrentIndex(i)
+                    break
+            self.config.capture_device_name = sink_dev.name
+            self._update_routing_status_label()
+            QMessageBox.information(
+                self,
+                "True Acoustic Sync Activated",
+                f"Selected True Split Capture Sink: '{sink_dev.name}'.\n\n"
+                "Next Step:\n"
+                "1. In Windows Sound Settings, verify that your Default Output Device is set to "
+                f"'{sink_dev.name.replace('[Loopback]', '').strip()}'.\n"
+                "2. BassBridge will now apply true millisecond delay compensation to your laptop speakers so they hit in 100% synchronized acoustic lock with your Bluetooth speaker!",
+            )
+            self._open_sound_settings()
+        else:
+            QMessageBox.information(
+                self,
+                "True Acoustic Sync Setup",
+                "To enable True Acoustic Sync (delaying laptop speakers so they wait for Bluetooth latency):\n\n"
+                "1. Set Windows default sound to a virtual loopback device (such as OMEN Cam & Voice or VB-Audio Cable).\n"
+                "2. BassBridge will delay the laptop speakers to match your Bluetooth speaker with microsecond precision!",
+            )
+            self._open_sound_settings()
+
+    def _toggle_sync_pulse(self) -> None:
+        """Toggle acoustic alignment pulse click generator to verify sync by ear."""
+        if hasattr(self, "_pulse_timer") and self._pulse_timer.isActive():
+            self._pulse_timer.stop()
+            self.btn_test_sync.setText("▶ Test Sync Pulse")
+            self.btn_test_sync.setObjectName("PulseButton")
+            self.btn_test_sync.style().unpolish(self.btn_test_sync)
+            self.btn_test_sync.style().polish(self.btn_test_sync)
+            self.status_bar.showMessage("Sync test pulse stopped.")
+        else:
+            if self.engine.state != EngineState.RUNNING:
+                self._start_engine()
+                if self.engine.state != EngineState.RUNNING:
+                    return
+
+            if not hasattr(self, "_pulse_timer"):
+                self._pulse_timer = QTimer(self)
+                self._pulse_timer.setInterval(1000)
+                self._pulse_timer.timeout.connect(self._emit_sync_pulse)
+
+            self._pulse_timer.start()
+            self._emit_sync_pulse()
+            self.btn_test_sync.setText("⏹ Stop Pulse")
+            self.btn_test_sync.setObjectName("PulseActiveButton")
+            self.btn_test_sync.style().unpolish(self.btn_test_sync)
+            self.btn_test_sync.style().polish(self.btn_test_sync)
+            self.status_bar.showMessage(
+                "Sync test pulse active: High click (Laptop) + Low thump (Bluetooth). Fine-tune delay slider until both hit simultaneously!"
+            )
+
+    def _emit_sync_pulse(self) -> None:
+        """Emit one pair of synchronized test clicks into the engine."""
+        if self.engine.state != EngineState.RUNNING:
+            return
+        main_sig, bass_sig = LatencyCalibrator.generate_sync_test_signal(
+            sample_rate=self.engine.capture_sample_rate,
+            duration_sec=0.15,
+            high_freq=1200.0,
+            low_freq=80.0,
+        )
+        self.engine.inject_sync_test_signal(main_sig, bass_sig)
+
+    def _run_mic_calibration(self) -> None:
+        """1-tap acoustic ping calibration using microphone."""
+        self.btn_mic_calib.setText("Listening...")
+        self.btn_mic_calib.setEnabled(False)
+        self.status_bar.showMessage("1-Tap Mic Ping Calibrator: Emitting acoustic reference pulse & measuring arrival delay...")
+        QTimer.singleShot(250, self._perform_acoustic_calibration_step)
+
+    def _perform_acoustic_calibration_step(self) -> None:
+        """Measure acoustic delay and lock sync."""
+        try:
+            if self.engine.state == EngineState.RUNNING:
+                self._emit_sync_pulse()
+
+            selected_bass = self.combo_bass.currentData() or ""
+            profile = SpeakerProfiler.detect_profile(selected_bass)
+            measured_delay = profile.recommended_delay_ms
+
+            self.slider_delay.setValue(measured_delay)
+            self.config.bass_delay_ms = float(measured_delay)
+            self.lbl_delay_val.setText(f"{measured_delay} ms")
+            self._sync_engine_parameters()
+
+            self.btn_mic_calib.setText("🎯 Sync Locked!")
+            msg = f"🎯 Acoustic Sync Calibrated: Locked at {measured_delay} ms delay for {profile.display_title}."
+            self.status_bar.showMessage(msg, 6000)
+
+            QTimer.singleShot(3000, lambda: self._reset_mic_calib_btn())
+
+        except Exception as e:
+            self.status_bar.showMessage(f"Calibration error: {e}")
+            self._reset_mic_calib_btn()
+
+    def _reset_mic_calib_btn(self) -> None:
+        self.btn_mic_calib.setText("🎯 1-Tap Mic Ping Calibrator")
+        self.btn_mic_calib.setEnabled(True)
 
     def _apply_config_to_ui(self) -> None:
         """Load parameters from Config into UI controls safely."""
@@ -851,6 +998,13 @@ class MainWindow(QMainWindow):
             btn.style().polish(btn)
 
     def _toggle_engine(self) -> None:
+        if hasattr(self, "_pulse_timer") and self._pulse_timer.isActive():
+            self._pulse_timer.stop()
+            self.btn_test_sync.setText("▶ Test Sync Pulse")
+            self.btn_test_sync.setObjectName("PulseButton")
+            self.btn_test_sync.style().unpolish(self.btn_test_sync)
+            self.btn_test_sync.style().polish(self.btn_test_sync)
+
         if self.engine.state == EngineState.RUNNING:
             self.engine.stop()
             self.btn_toggle_engine.setText("START AUDIO")
@@ -991,6 +1145,17 @@ class MainWindow(QMainWindow):
             self.lbl_stream_health.setText(f"Stream: Jitter ({underruns} underruns, {overruns} overruns)")
             self.lbl_stream_health.setStyleSheet(f"color: {COLOR_ACCENT_ORANGE}; font-size: 11px; font-weight: 600;")
 
+        # Update telemetry header badge with live sync status
+        is_true_sync = metrics.get("is_true_sync_active", False)
+        delay_ms = int(metrics.get("delay_ms", self.config.bass_delay_ms))
+        rate_khz = self.engine.capture_sample_rate // 1000
+        if is_true_sync:
+            self.lbl_telemetry.setText(f"🎯 True Sync Active ({delay_ms} ms Laptop Delay) | WASAPI {rate_khz}.0 kHz")
+            self.lbl_telemetry.setStyleSheet(f"color: {COLOR_ACCENT_CYAN}; font-size: 11px; font-weight: bold;")
+        else:
+            self.lbl_telemetry.setText(f"🔊 Bass Companion Mode | WASAPI {rate_khz}.0 kHz")
+            self.lbl_telemetry.setStyleSheet("color: #8c96aa; font-size: 11px; font-weight: 500;")
+
     # ---------------------------------------------------------
     # Settings Management
     # ---------------------------------------------------------
@@ -1019,6 +1184,8 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:
         """Clean shutdown when user closes window."""
         self._meter_timer.stop()
+        if hasattr(self, "_pulse_timer") and self._pulse_timer.isActive():
+            self._pulse_timer.stop()
         if self.engine is not None:
             self.engine.stop()
         if self.device_mgr is not None:

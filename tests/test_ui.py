@@ -38,6 +38,9 @@ def test_main_window_initialization(qapp, tmp_path):
     assert window.meter_bass is not None
     assert window.spectrum_view is not None
     assert window.btn_toggle_engine is not None
+    assert window.btn_true_sync is not None
+    assert window.btn_test_sync is not None
+    assert window.btn_mic_calib is not None
 
     # Test preset application via UI
     window._apply_preset("Movies")
@@ -52,6 +55,10 @@ def test_main_window_initialization(qapp, tmp_path):
 
     window.slider_delay.setValue(180)
     assert window.lbl_delay_val.text() == "180 ms"
+
+    # Test acoustic calibration step
+    window._perform_acoustic_calibration_step()
+    assert window.slider_delay.value() > 0
 
     # Test close
     window.close()

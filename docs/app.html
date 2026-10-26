@@ -793,13 +793,18 @@
                 mainGainNode = audioCtx.createGain();
                 mainGainNode.gain.value = mainVol;
 
-                // Connect Main Chain: masterGain -> hp1 -> hp2 -> dolby -> mainGainNode
+                // Main Speaker Delay: Delays laptop/phone audio so it waits for Bluetooth RF latency
+                delayNode = audioCtx.createDelay(1.0);
+                delayNode.delayTime.value = currentDelayMs / 1000.0;
+
+                // Connect Main Chain: masterGain -> hp1 -> hp2 -> dolby -> mainGainNode -> delayNode
                 masterGain.connect(hpFilter1);
                 hpFilter1.connect(hpFilter2);
                 hpFilter2.connect(dolbyFilter);
                 dolbyFilter.connect(mainGainNode);
+                mainGainNode.connect(delayNode);
 
-                // 2. BASS AUDIO PATH (Sub-Bass Low-Pass, Subsonic Cut, Delay)
+                // 2. BASS AUDIO PATH (Sub-Bass Low-Pass, Subsonic Cut - Instant to Bluetooth)
                 lpFilter1 = audioCtx.createBiquadFilter();
                 lpFilter1.type = 'lowpass';
                 lpFilter1.frequency.value = currentCrossover;
@@ -818,25 +823,21 @@
                 bassGainNode = audioCtx.createGain();
                 bassGainNode.gain.value = bassVol;
 
-                delayNode = audioCtx.createDelay(1.0);
-                delayNode.delayTime.value = currentDelayMs / 1000.0;
-
                 analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 256;
 
-                // Connect Bass Chain: masterGain -> lp1 -> lp2 -> infra -> bassGainNode -> delay -> analyser
+                // Connect Bass Chain: masterGain -> lp1 -> lp2 -> infra -> bassGainNode -> analyser
                 masterGain.connect(lpFilter1);
                 lpFilter1.connect(lpFilter2);
                 lpFilter2.connect(infraFilter);
                 infraFilter.connect(bassGainNode);
-                bassGainNode.connect(delayNode);
-                delayNode.connect(analyser);
+                bassGainNode.connect(analyser);
 
                 // 3. PHYSICAL HARDWARE STREAMS
                 mainStreamDest = audioCtx.createMediaStreamDestination();
                 bassStreamDest = audioCtx.createMediaStreamDestination();
 
-                mainGainNode.connect(mainStreamDest);
+                delayNode.connect(mainStreamDest);
                 analyser.connect(bassStreamDest);
 
                 mainAudioSinkEl = document.getElementById('main-audio-sink');
@@ -851,10 +852,10 @@
                     bassAudioSinkEl.play().catch(() => {});
                 }
 
-                // 4. STEREO SPLIT CHANNEL MERGER (Left = Main/Dialogue, Right = Bass/Sub)
+                // 4. STEREO SPLIT CHANNEL MERGER (Left = Delayed Main/Dialogue, Right = Instant Bass/Sub)
                 channelMerger = audioCtx.createChannelMerger(2);
-                mainGainNode.connect(channelMerger, 0, 0); // L channel
-                analyser.connect(channelMerger, 0, 1);     // R channel
+                delayNode.connect(channelMerger, 0, 0); // L channel = Delayed Main (Laptop)
+                analyser.connect(channelMerger, 0, 1);  // R channel = Sub-Bass (Bluetooth)
                 channelMerger.connect(audioCtx.destination);
 
                 // Apply initial routing
@@ -1346,21 +1347,32 @@
         function triggerSyncClick() {
             initAudio();
             const now = audioCtx.currentTime;
-            const osc = audioCtx.createOscillator();
-            const g = audioCtx.createGain();
 
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(1000, now);
-            osc.frequency.exponentialRampToValueAtTime(80, now + 0.03);
+            // 1. High-frequency crisp click (Main Speaker path - delayed by delayNode)
+            const oscMain = audioCtx.createOscillator();
+            const gMain = audioCtx.createGain();
+            oscMain.type = 'triangle';
+            oscMain.frequency.setValueAtTime(1400, now);
+            oscMain.frequency.exponentialRampToValueAtTime(700, now + 0.025);
+            gMain.gain.setValueAtTime(0.7 * mainVol, now);
+            gMain.gain.exponentialRampToValueAtTime(0.001, now + 0.025);
+            oscMain.connect(gMain);
+            gMain.connect(mainGainNode); // Routes through delayNode to Laptop/Phone speaker!
+            oscMain.start(now);
+            oscMain.stop(now + 0.025);
 
-            g.gain.setValueAtTime(0.8, now);
-            g.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
-
-            osc.connect(g);
-            g.connect(masterGain);
-
-            osc.start(now);
-            osc.stop(now + 0.03);
+            // 2. Low-frequency punchy thump (Bass Speaker path - instant to Bluetooth)
+            const oscBass = audioCtx.createOscillator();
+            const gBass = audioCtx.createGain();
+            oscBass.type = 'sine';
+            oscBass.frequency.setValueAtTime(80, now);
+            oscBass.frequency.exponentialRampToValueAtTime(50, now + 0.035);
+            gBass.gain.setValueAtTime(0.9 * bassVol, now);
+            gBass.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+            oscBass.connect(gBass);
+            gBass.connect(bassGainNode); // Routes directly to Bluetooth speaker!
+            oscBass.start(now);
+            oscBass.stop(now + 0.035);
         }
 
         function toggleBassTone() {
